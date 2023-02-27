@@ -1,0 +1,23 @@
+{
+  "folders": [
+    {
+      "path": "server"
+    },
+    {
+      "path": "game"
+    },
+    {
+      "path": "remote"
+    },
+    { 
+      "path": "server-api"
+    },
+    {
+      "path": "game-api"
+    }
+  ],
+  "settings": {
+    "liveServer.settings.multiRootWorkspaceName": "remote"
+  }
+}
+
