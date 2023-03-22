@@ -1,16 +1,24 @@
+mod controllers;
+mod game;
 mod room_code;
+mod signal;
 
+use actix::Actor;
+use controllers::WebRTCData;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::{Texture, WindowCanvas};
 // "self" imports the "image" module itself as well as everything else we listed
+use anyhow::Result;
 use image::LoadTexture;
-use qrcode::QrCode;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
+use std::sync::Arc;
 use std::time::Duration;
+
+use crate::controllers::start_peer_connection;
 
 const PLAYER_MOVEMENT_SPEED: i32 = 20;
 
@@ -84,22 +92,34 @@ fn update_player(player: &mut Player) {
     }
 }
 
-fn main() -> Result<(), String> {
-    let code = QrCode::new(b"Hello").unwrap();
-    let string = code
-        .render::<char>()
-        .quiet_zone(false)
-        .module_dimensions(2, 1)
-        .build();
+#[tokio::main]
+async fn main() -> Result<(), String> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(1000);
 
-    println!("{}", string);
+    loop {
+        println!("enter new sdp> ");
+        let line = signal::must_read_stdin().expect("failed to read stdin");
+        let sdp_offer = signal::decode(line.as_str()).expect("failed to decode");
+        let sender = tx.clone();
 
-    let sdl_context = sdl2::init()?;
+        tokio::spawn(async move {
+            start_peer_connection(sdp_offer, sender).await;
+        });
+
+        if let Some(answer) = rx.recv().await {
+            println!(
+                "\nmain thread got answer: {}",
+                signal::encode(answer.as_str())
+            );
+        }
+    }
+
+    let sdl_context = sdl2::init().expect("failed to create context");
     let video_subsystem = sdl_context.video()?;
     // Leading "_" tells Rust that this is an unused variable that we don't care about. It has to
     // stay unused because if we don't have any variable at all then Rust will treat it as a
     // temporary value and drop it right away!
-    let _image_context = image::init(InitFlag::PNG | InitFlag::JPG)?;
+    let _image_context = image::init(InitFlag::PNG | InitFlag::JPG).expect("failed to get image");
 
     let window = video_subsystem
         .window("game tutorial", 800, 600)
@@ -113,7 +133,9 @@ fn main() -> Result<(), String> {
         .expect("could not make a canvas");
 
     let texture_creator = canvas.texture_creator();
-    let texture = texture_creator.load_texture("assets/bardo.png")?;
+    let texture = texture_creator
+        .load_texture("assets/bardo.png")
+        .expect("failed to load texture");
 
     let mut player = Player {
         position: Point::new(0, 0),

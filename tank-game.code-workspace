@@ -9,15 +9,17 @@
     {
       "path": "remote"
     },
-    { 
+    {
       "path": "server-api"
     },
     {
       "path": "game-api"
+    },
+    {
+      "path": "model"
     }
   ],
   "settings": {
     "liveServer.settings.multiRootWorkspaceName": "remote"
   }
 }
-
