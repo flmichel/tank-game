@@ -1,9 +1,5 @@
 use anyhow::Result;
-use std::{io, sync::Arc, time::Duration};
-
-use actix::{
-    Actor, Addr, Arbiter, AsyncContext, Context, Handler, Message, ResponseFuture, WrapFuture,
-};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::Sender;
 use webrtc::{
     api::{
@@ -14,7 +10,7 @@ use webrtc::{
     ice_transport::ice_server::RTCIceServer,
     interceptor::registry::Registry,
     peer_connection::{
-        self, configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,
+        configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,
         sdp::session_description::RTCSessionDescription, RTCPeerConnection,
     },
 };

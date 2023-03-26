@@ -1,10 +1,10 @@
 mod controllers;
 mod game;
 mod room_code;
+mod server_communication;
 mod signal;
 
-use actix::Actor;
-use controllers::WebRTCData;
+use futures_channel::mpsc::{self, unbounded};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -15,10 +15,8 @@ use anyhow::Result;
 use image::LoadTexture;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
-use std::sync::Arc;
+use server_communication::{connect_to_server, SdpMessage, ServerMessage};
 use std::time::Duration;
-
-use crate::controllers::start_peer_connection;
 
 const PLAYER_MOVEMENT_SPEED: i32 = 20;
 
@@ -43,12 +41,12 @@ fn render(
     color: Color,
     texture: &Texture,
     player: &Player,
-    room_code: RoomCode,
+    room_code: &RoomCode,
 ) -> Result<(), String> {
     canvas.set_draw_color(color);
     canvas.clear();
 
-    let squares = room_code.get_qr_code_squares(20);
+    let squares = room_code.get_qr_code_squares(10);
     squares.iter().for_each(|(square, color)| {
         canvas.set_draw_color(*color);
         canvas.fill_rect(*square).unwrap();
@@ -94,9 +92,14 @@ fn update_player(player: &mut Player) {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(1000);
+    let (tx_server, mut rx_server) = unbounded();
+    let (tx_game, mut rx_game) = unbounded();
 
-    loop {
+    tokio::task::spawn(async move {
+        connect_to_server(tx_server, &mut rx_game).await;
+    });
+
+    /*loop {
         println!("enter new sdp> ");
         let line = signal::must_read_stdin().expect("failed to read stdin");
         let sdp_offer = signal::decode(line.as_str()).expect("failed to decode");
@@ -112,7 +115,7 @@ async fn main() -> Result<(), String> {
                 signal::encode(answer.as_str())
             );
         }
-    }
+    }*/
 
     let sdl_context = sdl2::init().expect("failed to create context");
     let video_subsystem = sdl_context.video()?;
@@ -146,6 +149,8 @@ async fn main() -> Result<(), String> {
 
     let mut event_pump = sdl_context.event_pump()?;
     let mut i = 0;
+
+    let mut room_code = RoomCode::new("Hello World".to_owned());
     'running: loop {
         // Handle events
         for event in event_pump.poll_iter() {
@@ -215,6 +220,12 @@ async fn main() -> Result<(), String> {
             }
         }
 
+        // Update room_id
+        if let Ok(Some(ServerMessage::RoomId(id))) = rx_server.try_next() {
+            println!("creating qrcode with room_id {}", id);
+            room_code = RoomCode::new(format!("http://wikipedia.org/{}", id).to_owned());
+        }
+
         // Update
         i = (i + 1) % 255;
         update_player(&mut player);
@@ -225,11 +236,11 @@ async fn main() -> Result<(), String> {
             Color::RGB(i, 64, 255 - i),
             &texture,
             &player,
-            RoomCode::new("Hello World".to_owned()),
+            &room_code,
         )?;
 
         // Time management!
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
+        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
     }
 
     Ok(())
