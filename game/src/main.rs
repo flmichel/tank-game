@@ -223,7 +223,8 @@ async fn main() -> Result<(), String> {
         // Update room_id
         if let Ok(Some(ServerMessage::RoomId(id))) = rx_server.try_next() {
             println!("creating qrcode with room_id {}", id);
-            room_code = RoomCode::new(format!("http://wikipedia.org/{}", id).to_owned());
+            room_code =
+                RoomCode::new(format!("http://192.168.0.106:5500/?room-id={}", id).to_owned());
         }
 
         // Update

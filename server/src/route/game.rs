@@ -6,6 +6,7 @@ use axum::{
 };
 
 use serde::Deserialize;
+use serde_json::to_string;
 use tokio::sync::mpsc;
 
 use crate::games_communication::{RoomMap, SdpOffer};
@@ -15,7 +16,12 @@ pub async fn post_sdp_session(
     Path(id): Path<String>,
     Json(body): Json<String>,
 ) -> impl IntoResponse {
-    println!("room id {}", body);
+    println!("room id {}", id);
+    room_map
+        .lock()
+        .await
+        .keys()
+        .for_each(|key| print!("{}", key));
     if let Some(tx_game) = room_map.lock().await.get(&id) {
         let (tx, mut rx) = mpsc::channel(1);
         let request = SdpOffer {

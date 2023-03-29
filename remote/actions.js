@@ -11,6 +11,8 @@ export const Actions = {
   TryLogin: "tryLogin",
   TryRegister: "tryRegister",
   Login: "login",
+  AddSdpOffer: "addSdpOffer",
+  AddRoomId: "addRoomId",
 };
 
 let increment = (_) => ++state.counter;
@@ -50,6 +52,32 @@ let login = (email) => {
   route("/");
 };
 
+let tryConnectToRoom = () => {
+  let roomId = state.roomId;
+  let sdpOffer = state.webRTC.sdpOffer;
+  if (roomId !== undefined && sdpOffer !== undefined) {
+    console.log("Attempting to connect to");
+    state.pendingRequests.push({
+      name: Requests.PostSdpOffer,
+      parameters: {
+        roomId: roomId,
+        sdpOffer: sdpOffer,
+      },
+    });
+  }
+};
+
+let addSdpOffer = (plainOffer) => {
+  console.log("got plain offer", plainOffer);
+  state.webRTC.sdpOffer = btoa(JSON.stringify(plainOffer));
+  tryConnectToRoom();
+};
+
+let addRoomId = (roomId) => {
+  state.roomId = roomId;
+  tryConnectToRoom();
+};
+
 export const actionsMap = new Map([
   [Actions.Increment, increment],
   [Actions.Decrement, decrement],
@@ -58,6 +86,9 @@ export const actionsMap = new Map([
   [Actions.TryLogin, tryLogin],
   [Actions.Login, login],
   [Actions.TryRegister, tryRegister],
+  [Actions.TryConnectToRoom, tryConnectToRoom],
+  [Actions.AddSdpOffer, addSdpOffer],
+  [Actions.AddRoomId, addRoomId],
 ]);
 
 export function trigger(actionName, data) {

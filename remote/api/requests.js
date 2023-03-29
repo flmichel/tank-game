@@ -3,6 +3,7 @@ import { trigger, Actions } from "../actions.js";
 export const Requests = {
   Login: "login",
   Register: "register",
+  PostSdpOffer: "postSdpOffer",
 };
 
 async function login(parameters) {
@@ -25,9 +26,17 @@ async function register(parameters) {
   return [Actions.Login, parameters.email];
 }
 
+async function postSdpOffer(parameters) {
+  const sdpResponse = await post(
+    "/room-id/" + parameters.roomId,
+    parameters.sdpOffer
+  );
+}
+
 export const requestsMap = new Map([
   [Requests.Login, login],
   [Requests.Register, register],
+  [Requests.PostSdpOffer, postSdpOffer],
 ]);
 
 export async function execute(pendingRequests) {
