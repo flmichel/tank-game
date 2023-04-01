@@ -1,0 +1,24 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+' uncomment the following line and comment the first to use locally
+' !include C4_Component.puml
+
+SHOW_PERSON_OUTLINE()
+AddElementTag("backendContainer", $fontColor=$ELEMENT_FONT_COLOR, $bgColor="#335DA5", $shape=EightSidedShape(), $legendText="backend container\neight sided")
+
+title Component Diragram of the Game
+
+Person(player, Player, "One a the player of the game")
+Container(remote, "Remote", "JavaScript", "Web applicaiton access from a smartphone that is the remote for the game")
+Container(server_api, "Server API", "Rust", "Provides Internet banking functionality via API", $tags="backendContainer")
+System_Ext(stun, "STUN Server", "The STUN server used to establish WebRTC connections")
+
+Container_Boundary(game, "Game") {
+    Component(game_engine, "Sign In Controller", "", "Allows users to sign in to the internet banking system")
+    Component(server_connection, "Accounts Summary Controller", "MVC Rest Controller", "Provides customers with a summary of their bank accounts")
+    Component(remote_connection, "Security Component", "Spring Bean", "Provides functionality related to singing in, changing passwords, etc.")
+    Component(remote_connection_creator, "Mainframe Banking System Facade", "Spring Bean", "A facade onto the mainframe banking system.")
+}
+
+
+@enduml

@@ -21,7 +21,7 @@ pub async fn post_sdp_session(
         .lock()
         .await
         .keys()
-        .for_each(|key| print!("{}", key));
+        .for_each(|key| print!("entry in the map {}", key));
     if let Some(tx_game) = room_map.lock().await.get(&id) {
         let (tx, mut rx) = mpsc::channel(1);
         let request = SdpOffer {

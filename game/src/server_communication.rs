@@ -5,13 +5,15 @@ use futures_util::{future, pin_mut, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 #[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
+#[serde(untagged)]
 pub enum ServerMessage {
     RoomId(String),
     SdpOffer(SdpMessage),
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct SdpMessage {
     id: u32,
     data: String,

@@ -27,10 +27,11 @@ async function register(parameters) {
 }
 
 async function postSdpOffer(parameters) {
-  const sdpResponse = await post(
-    "/room-id/" + parameters.roomId,
+  const response = await post(
+    "/game/" + parameters.roomId,
     parameters.sdpOffer
   );
+  console.log(response);
 }
 
 export const requestsMap = new Map([

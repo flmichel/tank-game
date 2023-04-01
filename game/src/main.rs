@@ -3,6 +3,7 @@ mod game;
 mod room_code;
 mod server_communication;
 mod signal;
+mod server_connection;
 
 use futures_channel::mpsc::{self, unbounded};
 use sdl2::event::Event;
@@ -220,7 +221,15 @@ async fn main() -> Result<(), String> {
             }
         }
 
-        // Update room_id
+        if let Ok(Some(message)) = rx_server.try_next() {
+            match message {
+                ServerMessage::RoomId(id) => { println!("creating qrcode with room_id {}", id);
+                room_code =
+                    RoomCode::new(format!("http://192.168.0.106:5500/?room-id={}", id).to_owned());
+                },
+                ServerMessage::SdpOffer(sdpMessage)
+            }
+        }
         if let Ok(Some(ServerMessage::RoomId(id))) = rx_server.try_next() {
             println!("creating qrcode with room_id {}", id);
             room_code =

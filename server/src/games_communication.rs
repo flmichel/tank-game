@@ -22,13 +22,15 @@ pub struct SdpOffer {
 }
 
 #[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
+#[serde(untagged)]
 pub enum GameMessage {
     RoomId(String),
     SdpOffer(SdpMessage),
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct SdpMessage {
     pub data: String,
     pub id: u32,
