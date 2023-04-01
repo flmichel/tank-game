@@ -1,0 +1,22 @@
+@startuml context
+!include containers_definition.puml
+
+SHOW_PERSON_OUTLINE()
+AddElementTag("backendContainer", $fontColor=$ELEMENT_FONT_COLOR, $bgColor="#335DA5", $shape=EightSidedShape(), $legendText="backend container\neight sided")
+
+player()
+System_Boundary(c2, "Gaming Platform") {
+    game()
+    remote()
+    server_api()
+}
+stun()
+
+Rel(player, game, "Watches the game on a screen")
+Rel(player, remote, "Uses")
+Rel(game, stun, "Request networking info for webRTC connection")
+Rel(remote, stun, "Request networking info for webRTC connection")
+Rel(game, server_api, "Communicates with", "WebSocket")
+Rel(remote, server_api, "Communicates with", "HTTPS")
+Rel_R(remote, game, "Send inputs", "WebRTC")
+@enduml

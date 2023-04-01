@@ -1,14 +1,11 @@
-Regular **Markdown** here.
+# Architecture
 
-<!--
-@startuml firstDiagram
+The gaming platform is composed of the different elements:
 
-Alice -> Bob: Hello
-Bob -> Alice: Hi!
+1. A player
+2. A [remote](remote.md)
+3. A [game](game.md)
+4. A [server api](server_api.md)
+5. A stun server
 
-@enduml
--->
-
-![](context.svg)
-
-Some more markdown.
+![](diagram/context.svg)

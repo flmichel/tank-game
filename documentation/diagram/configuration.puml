@@ -1,0 +1,6 @@
+@startuml configuration
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+skinparam defaultFontName Noto Sans
+
+SHOW_PERSON_OUTLINE()
+@enduml

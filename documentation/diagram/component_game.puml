@@ -1,0 +1,24 @@
+@startuml component_game
+!include containers_definition.puml
+
+remote()
+server_api()
+stun()
+
+Container_Boundary(game, "Game") {
+    Component(server_communicator, "Server communicator", "","Communicate with the server api")
+    Component(remote_communicator, "Remote communicator", "", "Recieve the input command from the remote of send them to the game")
+    Component(players_connector, "Players connector", "", "Enble the players to connect to the game using webRTC")
+    Component(game_logic, "Game logic", "", "Correspond to the logic of the game")
+
+    Rel(server_communicator, players_connector, "send players informations")
+    Rel_U(players_connector, remote_communicator, "create new remote communicators")
+    Rel_D(remote_communicator, game_logic, "send remote inputs")
+    Rel_D(server_communicator, game_logic, "send room id")
+}
+Rel(remote, remote_communicator, "Exchange game data", "WebRTC")
+Rel(server_api, server_communicator, "Send players informations", "WebSocket")
+Rel(players_connector, stun, "Request WebRTC information", "STUN")
+
+
+@enduml
