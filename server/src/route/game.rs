@@ -28,6 +28,7 @@ pub async fn post_sdp_session(
             offer: body,
             return_channel: tx.clone(),
         };
+        println!("send offer to game");
         tx_game.unbounded_send(request).unwrap();
         match rx.recv().await {
             Some(description) => (StatusCode::OK, description),

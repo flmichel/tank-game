@@ -1,11 +1,14 @@
 mod controllers;
 mod game;
+mod players_connector;
+mod remote_communicator;
 mod room_code;
-mod server_communication;
+mod server_communicator;
 mod signal;
-mod server_connection;
 
-use futures_channel::mpsc::{self, unbounded};
+use futures_channel::mpsc::{channel, unbounded};
+use game::MessageToGame;
+use players_connector::PlayersConnector;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -16,8 +19,9 @@ use anyhow::Result;
 use image::LoadTexture;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
-use server_communication::{connect_to_server, SdpMessage, ServerMessage};
+use server_communicator::ServerCommunicator;
 use std::time::Duration;
+use tokio::spawn;
 
 const PLAYER_MOVEMENT_SPEED: i32 = 20;
 
@@ -93,30 +97,24 @@ fn update_player(player: &mut Player) {
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    let (tx_server, mut rx_server) = unbounded();
-    let (tx_game, mut rx_game) = unbounded();
+    let (sender_to_server, receiver_server) = unbounded();
+    let (sender_to_player_connector, receiver_player_connector) = unbounded();
+    let (sender_to_game, mut receiver_game) = unbounded();
 
-    tokio::task::spawn(async move {
-        connect_to_server(tx_server, &mut rx_game).await;
-    });
+    let mut players_connector = PlayersConnector::new(
+        sender_to_server,
+        sender_to_game.clone(),
+        receiver_player_connector,
+    );
+    spawn(async move { players_connector.start().await });
 
-    /*loop {
-        println!("enter new sdp> ");
-        let line = signal::must_read_stdin().expect("failed to read stdin");
-        let sdp_offer = signal::decode(line.as_str()).expect("failed to decode");
-        let sender = tx.clone();
-
-        tokio::spawn(async move {
-            start_peer_connection(sdp_offer, sender).await;
-        });
-
-        if let Some(answer) = rx.recv().await {
-            println!(
-                "\nmain thread got answer: {}",
-                signal::encode(answer.as_str())
-            );
-        }
-    }*/
+    let server_communicator = ServerCommunicator::new(
+        sender_to_game,
+        sender_to_player_connector,
+        receiver_server,
+        "ws://localhost:5000",
+    );
+    spawn(async move { server_communicator.start().await });
 
     let sdl_context = sdl2::init().expect("failed to create context");
     let video_subsystem = sdl_context.video()?;
@@ -221,19 +219,16 @@ async fn main() -> Result<(), String> {
             }
         }
 
-        if let Ok(Some(message)) = rx_server.try_next() {
+        if let Ok(Some(message)) = receiver_game.try_next() {
             match message {
-                ServerMessage::RoomId(id) => { println!("creating qrcode with room_id {}", id);
-                room_code =
-                    RoomCode::new(format!("http://192.168.0.106:5500/?room-id={}", id).to_owned());
-                },
-                ServerMessage::SdpOffer(sdpMessage)
+                MessageToGame::RoomId(id) => {
+                    println!("creating qrcode with room_id {}", id);
+                    room_code = RoomCode::new(
+                        format!("http://192.168.0.106:5500/?room-id={}", id).to_owned(),
+                    );
+                }
+                _ => println!("what"),
             }
-        }
-        if let Ok(Some(ServerMessage::RoomId(id))) = rx_server.try_next() {
-            println!("creating qrcode with room_id {}", id);
-            room_code =
-                RoomCode::new(format!("http://192.168.0.106:5500/?room-id={}", id).to_owned());
         }
 
         // Update

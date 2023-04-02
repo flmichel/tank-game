@@ -31,6 +31,7 @@ async function postSdpOffer(parameters) {
     "/game/" + parameters.roomId,
     parameters.sdpOffer
   );
+  console.log("Got a response!!!");
   console.log(response);
 }
 

@@ -81,7 +81,7 @@ async fn handle_connection(room_map: RoomMap, raw_stream: TcpStream, addr: Socke
 
     let send_sdp_answer = incoming.try_for_each(|msg| {
         println!(
-            "Received a message from {}: {}",
+            "Received an answer from {}: {}",
             addr,
             msg.to_text().unwrap()
         );
@@ -100,6 +100,7 @@ async fn handle_connection(room_map: RoomMap, raw_stream: TcpStream, addr: Socke
 
     let receive_sdp_offers = rx
         .map(|request| {
+            println!("offer recieved by server communicator");
             request_map
                 .lock()
                 .unwrap()

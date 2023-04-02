@@ -18,8 +18,7 @@ base64 = "0.21"
 tokio-tungstenite = "*"
 futures-util = "0.3"
 futures-channel = "0.3"
-async-stream = "0.3"
-
+derive_builder = "0.12"
 
 [dependencies.sdl2]
 version = "0.35"
