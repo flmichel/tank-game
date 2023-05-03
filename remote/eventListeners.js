@@ -12,8 +12,9 @@ export default function addAllEventListeners() {
     state.webRTC.sendChannel = pc.createDataChannel("channel");
 
     pc.onicecandidate = (event) => {
-      console.log("got offer");
-      trigger(Actions.AddSdpOffer, pc.localDescription);
+      if (event.candidate) {
+        trigger(Actions.AddSdpOffer, pc.localDescription);
+      }
     };
 
     pc.onnegotiationneeded = (e) =>

@@ -1,18 +1,14 @@
-mod authentication;
-mod games_communication;
-mod repository;
-mod route;
 use axum::{
     routing::{get, post},
     Extension, Router,
 };
 
-use games_communication::{connect_to_game_instances, RoomMap};
-use repository::{Account, Repo};
-use route::login::*;
-use route::post_sdp_session;
-use route::user::registration::*;
-use sqlx::postgres::PgPoolOptions;
+use server::games_api::{start_game_application, RoomMap};
+use server::repository::{Account, Repo};
+use server::route::login::*;
+use server::route::post_sdp_session;
+use server::route::user::registration::*;
+use server::{configuration::get_configuration, startup::get_database_pool};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::{sync::Mutex, task};
 use tower_http::cors::CorsLayer;
@@ -22,21 +18,22 @@ async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
+    let settings = get_configuration().expect("configuration error");
+
+    let database_pool = get_database_pool(&settings.database)
+        .await
+        .expect("database connection error");
+
     let room_map = RoomMap::new(Mutex::new(HashMap::new()));
 
     let room_map_clone = room_map.clone();
     task::spawn(async move {
-        connect_to_game_instances(room_map_clone).await;
+        start_game_application(room_map_clone, &settings.application)
+            .await
+            .expect("could not start websocket");
     });
 
-    let database_url = String::from("postgres://postgres:password@localhost:5432/tank-game");
-    //std::env::var("DATABASE_URL").expect("set DATABASE_URL environment variable");
-    let db = PgPoolOptions::new()
-        .connect(&database_url)
-        .await
-        .expect("unable to connect to database");
-
-    let account_repo = Repo::<Account>::new(db);
+    let account_repo = Repo::<Account>::new(database_pool);
 
     let app = Router::new()
         .route("/login", post(login))

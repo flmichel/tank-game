@@ -5,6 +5,7 @@ export let render = (state) => {
   switch (state.route) {
     case "/":
       output += `
+        <a>is connected ${state.webRTC.isChannelOpen}</a>
         <button onclick="trigger('${Actions.Decrement}', {})"">decrease</button>
         <a>${state.counter}</a>
         <button onclick="trigger('${Actions.Increment}', {})">Increase</button>

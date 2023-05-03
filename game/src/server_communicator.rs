@@ -1,7 +1,6 @@
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures_util::{future, pin_mut, FutureExt, SinkExt, StreamExt};
+use futures_util::{future, pin_mut, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncReadExt;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::game::MessageToGame;
@@ -22,6 +21,7 @@ pub struct SdpMessage {
 }
 
 #[derive(Serialize, Debug)]
+#[serde(untagged)]
 pub enum MessageToServer {
     SdpAnswer(SdpMessage),
 }
@@ -29,7 +29,7 @@ pub enum MessageToServer {
 pub struct ServerCommunicator {
     sender_to_game: UnboundedSender<MessageToGame>,
     sender_to_player_connector: UnboundedSender<SdpMessage>,
-    receiver: UnboundedReceiver<MessageToServer>,
+    //receiver: UnboundedReceiver<MessageToServer>,
     url: String,
 }
 
@@ -41,26 +41,26 @@ impl ServerCommunicator {
     pub fn new<S: Into<String>>(
         sender_to_game: UnboundedSender<MessageToGame>,
         sender_to_player_connector: UnboundedSender<SdpMessage>,
-        receiver: UnboundedReceiver<MessageToServer>,
+        //receiver: UnboundedReceiver<MessageToServer>,
         url: S,
     ) -> Self {
         Self {
             sender_to_game,
             sender_to_player_connector,
-            receiver,
+            //receiver: receiver,
             url: url.into(),
         }
     }
 
-    pub async fn start(mut self) {
-        let (mut ws_stream, _) = connect_async(&self.url).await.expect("Failed to connect");
-        ws_stream.send(Message::text("lol")).await.unwrap();
+    pub async fn start(self, receiver: UnboundedReceiver<MessageToServer>) {
+        let (ws_stream, _) = connect_async(&self.url).await.expect("Failed to connect");
 
         println!("WebSocket handshake has been successfully completed");
 
         let (write, read) = ws_stream.split();
 
         let handle_server_messages = read.for_each(|message| async {
+            print!("receive message from server: {:?}", message);
             let message = message.unwrap();
             let message: ServerMessage = serde_json::from_str(&message.to_text().unwrap()).unwrap();
             match message {
@@ -77,17 +77,17 @@ impl ServerCommunicator {
             }
         });
 
-        let handle_answer = self
-            .receiver
+        let handle_answer = receiver
             .map(|answer| {
                 println!("answer received by server_communicator");
-                Message::text(serde_json::to_string(&answer).unwrap())
+                Ok(Message::text(serde_json::to_string(&answer).unwrap()))
             })
-            .map(Ok)
             .forward(write);
 
         pin_mut!(handle_server_messages, handle_answer);
         future::select(handle_server_messages, handle_answer).await;
+        //pin_mut!(handle_server_messages);
+        //handle_server_messages.await;
     }
 }
 

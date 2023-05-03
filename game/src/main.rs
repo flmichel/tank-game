@@ -6,8 +6,8 @@ mod room_code;
 mod server_communicator;
 mod signal;
 
-use futures_channel::mpsc::{channel, unbounded};
-use game::MessageToGame;
+use futures_channel::mpsc::unbounded;
+use game::{Input, MessageToGame};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -19,7 +19,7 @@ use anyhow::Result;
 use image::LoadTexture;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
-use server_communicator::ServerCommunicator;
+use server_communicator::{MessageToServer, SdpMessage, ServerCommunicator};
 use std::time::Duration;
 use tokio::spawn;
 
@@ -102,7 +102,7 @@ async fn main() -> Result<(), String> {
     let (sender_to_game, mut receiver_game) = unbounded();
 
     let mut players_connector = PlayersConnector::new(
-        sender_to_server,
+        sender_to_server.clone(),
         sender_to_game.clone(),
         receiver_player_connector,
     );
@@ -111,10 +111,16 @@ async fn main() -> Result<(), String> {
     let server_communicator = ServerCommunicator::new(
         sender_to_game,
         sender_to_player_connector,
-        receiver_server,
+        //receiver_server,
         "ws://localhost:5000",
     );
-    spawn(async move { server_communicator.start().await });
+    spawn(async move { server_communicator.start(receiver_server).await });
+
+    let answer = MessageToServer::SdpAnswer(SdpMessage {
+        data: "hello".to_owned(),
+        id: 23,
+    });
+    //sender_to_server.unbounded_send(answer).unwrap();
 
     let sdl_context = sdl2::init().expect("failed to create context");
     let video_subsystem = sdl_context.video()?;
@@ -227,7 +233,14 @@ async fn main() -> Result<(), String> {
                         format!("http://192.168.0.106:5500/?room-id={}", id).to_owned(),
                     );
                 }
-                _ => println!("what"),
+                MessageToGame::Input(Input::A) => {
+                    player.speed = PLAYER_MOVEMENT_SPEED;
+                    player.direction = Direction::Right;
+                }
+                MessageToGame::Input(Input::B) => {
+                    player.speed = PLAYER_MOVEMENT_SPEED;
+                    player.direction = Direction::Left;
+                }
             }
         }
 

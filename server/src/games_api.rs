@@ -1,8 +1,12 @@
+use crate::{
+    configuration::ApplicationSettings,
+    result::{Error, ErrorKind::ConfigurationError},
+};
+
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use futures_channel::mpsc::{unbounded, UnboundedSender};
 use futures_util::{future, pin_mut, stream::TryStreamExt, SinkExt, StreamExt};
-
 use serde::{Deserialize, Serialize};
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -36,18 +40,22 @@ pub struct SdpMessage {
     pub id: u32,
 }
 
-pub async fn connect_to_game_instances(room_map: RoomMap) {
-    let addr = "127.0.0.1:5000";
-
+pub async fn start_game_application(
+    room_map: RoomMap,
+    settings: &ApplicationSettings,
+) -> Result<(), Error> {
     // Create the event loop and TCP listener we'll accept connections on.
-    let try_socket = TcpListener::bind(&addr).await;
-    let listener = try_socket.expect("Failed to bind");
-    println!("Listening on: {}", addr);
+    let listener = TcpListener::bind(&settings.get_game_path())
+        .await
+        .map_err(|err| {
+            Error::from(err, ConfigurationError).explain("failed to create tcp listener")
+        })?;
 
     // Let's spawn the handling of each connection in a separate task.
     while let Ok((stream, addr)) = listener.accept().await {
         tokio::spawn(handle_connection(room_map.clone(), stream, addr));
     }
+    Ok(())
 }
 
 async fn handle_connection(room_map: RoomMap, raw_stream: TcpStream, addr: SocketAddr) {
@@ -86,8 +94,7 @@ async fn handle_connection(room_map: RoomMap, raw_stream: TcpStream, addr: Socke
             msg.to_text().unwrap()
         );
         let sdp_answer = msg.to_text().unwrap();
-        let sdp_answer: SdpMessage = serde_json::from_str(&sdp_answer).unwrap();
-        print!("hellooooo");
+        let sdp_answer: SdpMessage = serde_json::from_str(sdp_answer).unwrap();
         request_map
             .lock()
             .unwrap()
