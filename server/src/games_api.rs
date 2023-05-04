@@ -14,6 +14,7 @@ use tokio::{
     sync::Mutex,
 };
 use tokio_tungstenite::tungstenite::Message;
+use tracing::{event, span, Level};
 
 pub type Tx = UnboundedSender<SdpOffer>;
 pub type RoomMap = Arc<Mutex<HashMap<String, Tx>>>;
@@ -52,19 +53,37 @@ pub async fn start_game_application(
         })?;
 
     // Let's spawn the handling of each connection in a separate task.
-    while let Ok((stream, addr)) = listener.accept().await {
-        tokio::spawn(handle_connection(room_map.clone(), stream, addr));
+    while let Ok((stream, game_room_address)) = listener.accept().await {
+        tokio::spawn(handle_connection(
+            room_map.clone(),
+            stream,
+            game_room_address,
+        ));
     }
     Ok(())
 }
 
-async fn handle_connection(room_map: RoomMap, raw_stream: TcpStream, addr: SocketAddr) {
-    println!("Incoming TCP connection from: {}", addr);
+async fn handle_connection(
+    room_map: RoomMap,
+    raw_stream: TcpStream,
+    game_room_address: SocketAddr,
+) {
+    let id = generate_id();
+    let _span = span!(Level::INFO, "game room", id);
+
+    event!(
+        Level::INFO,
+        "Incoming TCP connection from the address {}",
+        game_room_address
+    );
 
     let mut ws_stream = tokio_tungstenite::accept_async(raw_stream)
         .await
         .expect("Error during the websocket handshake occurred");
-    println!("WebSocket connection established: {}", addr);
+    println!(
+        "WebSocket connection established with the address: {}",
+        game_room_address
+    );
 
     let id = generate_id();
     let (tx, rx) = unbounded();
@@ -90,7 +109,7 @@ async fn handle_connection(room_map: RoomMap, raw_stream: TcpStream, addr: Socke
     let send_sdp_answer = incoming.try_for_each(|msg| {
         println!(
             "Received an answer from {}: {}",
-            addr,
+            game_room_address,
             msg.to_text().unwrap()
         );
         let sdp_answer = msg.to_text().unwrap();
@@ -125,7 +144,7 @@ async fn handle_connection(room_map: RoomMap, raw_stream: TcpStream, addr: Socke
     pin_mut!(send_sdp_answer, receive_sdp_offers);
     future::select(send_sdp_answer, receive_sdp_offers).await;
 
-    println!("{} disconnected", &addr);
+    println!("{} disconnected", &game_room_address);
     room_map.lock().await.remove(&id);
 }
 

@@ -1,24 +1,33 @@
+use std::str::FromStr;
+
 use crate::result::{Error, ErrorKind::*};
 use config;
+use tracing::Level;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub log: Option<Log>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     host: String,
     port: u16,
     name: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     host: String,
     web_port: u16,
     games_port: u16,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct Log {
+    level: Option<String>,
 }
 
 pub fn get_configuration() -> Result<Settings, Error> {
@@ -32,6 +41,19 @@ pub fn get_configuration() -> Result<Settings, Error> {
     settings.try_deserialize::<Settings>().map_err(|err| {
         Error::from(err, ConfigurationError).explain("configuration could not be deserialized")
     })
+}
+
+impl Settings {
+    pub fn get_log_level(&self) -> Result<Level, Error> {
+        if let Some(level) = self.log.clone().and_then(|log| log.level) {
+            Level::from_str(&level).map_err(|err| {
+                Error::from(err, ConfigurationError)
+                    .explain(format!("log level \"{}\" does not exist", level))
+            })
+        } else {
+            Ok(Level::INFO)
+        }
+    }
 }
 
 impl DatabaseSettings {

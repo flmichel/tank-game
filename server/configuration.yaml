@@ -6,3 +6,5 @@ database:
   host: postgres://postgres:password@localhost
   port: 5432
   name: tank-game
+log:
+  level: debug
