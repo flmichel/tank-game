@@ -22,7 +22,7 @@ use tokio::{
     sync::Mutex,
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 pub type Tx = UnboundedSender<SdpOffer>;
 pub type RoomMap = Arc<Mutex<HashMap<String, Tx>>>;
@@ -53,12 +53,13 @@ pub async fn start_game_application(
     room_map: RoomMap,
     settings: &ApplicationSettings,
 ) -> Result<(), Error> {
+    let game_path = settings.get_game_path();
     // Create the event loop and TCP listener we'll accept connections on.
-    let listener = TcpListener::bind(&settings.get_game_path())
-        .await
-        .map_err(|err| {
-            Error::from(err, ConfigurationError).explain("failed to create tcp listener")
-        })?;
+    let listener = TcpListener::bind(&game_path).await.map_err(|err| {
+        Error::from(err, ConfigurationError).explain("failed to create tcp listener")
+    })?;
+
+    info!("Starting listening for game room at address {}", game_path);
 
     // Let's spawn the handling of each connection in a separate task.
     while let Ok((stream, game_room_address)) = listener.accept().await {
@@ -113,7 +114,6 @@ async fn handle_connection(
 
     let receive_sdp_offers = message_receiver
         .map(|request| {
-            println!("offer recieved by server communicator");
             request_map
                 .lock()
                 .unwrap()
@@ -141,7 +141,6 @@ async fn handle_connection(
 fn generate_id() -> String {
     let random_bytes = rand::random::<[u8; 16]>().to_vec();
     let id = base64_url::encode(&random_bytes);
-    print!("{}", id);
     return id;
 }
 

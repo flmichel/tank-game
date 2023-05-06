@@ -10,7 +10,7 @@ export const Actions = {
   RouteBack: "routeBack",
   TryLogin: "tryLogin",
   TryRegister: "tryRegister",
-  Login: "login",   Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login",Login: "login", 
+  Login: "login",
   AddSdpOffer: "addSdpOffer",
   AddRoomId: "addRoomId",
   ConnectToRoom: "connectToRoom",
