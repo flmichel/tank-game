@@ -9,16 +9,20 @@ use crate::{
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use futures_channel::mpsc::{unbounded, UnboundedSender};
-use futures_util::{future, pin_mut, stream::TryStreamExt, Future, SinkExt, StreamExt};
+use futures_util::{
+    future::{self, Ready},
+    pin_mut,
+    stream::TryStreamExt,
+    SinkExt, StreamExt,
+};
 use serde::{de, Deserialize, Serialize};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc::Sender,
     sync::Mutex,
-    task::yield_now,
 };
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
-use tracing::{debug, error, span, Level};
+use tracing::{debug, error};
 
 pub type Tx = UnboundedSender<SdpOffer>;
 pub type RoomMap = Arc<Mutex<HashMap<String, Tx>>>;
@@ -58,10 +62,11 @@ pub async fn start_game_application(
 
     // Let's spawn the handling of each connection in a separate task.
     while let Ok((stream, game_room_address)) = listener.accept().await {
-        tokio::spawn(async {
-            handle_connection(room_map.clone(), stream, game_room_address).await;
-            yield_now().await;
-        });
+        tokio::spawn(handle_connection(
+            room_map.clone(),
+            stream,
+            game_room_address,
+        ));
     }
     Ok(())
 }
@@ -72,7 +77,6 @@ async fn handle_connection(
     game_room_address: SocketAddr,
 ) {
     let id = generate_id();
-    let span = span!(Level::INFO, "game room", id).entered();
 
     debug!(
         "Incoming TCP connection from the address {}",
@@ -92,8 +96,8 @@ async fn handle_connection(
 
     if let Err(err) = send_id_to_game_room(&mut ws_stream, id.clone()).await {
         error!(
-            "failed to send id to game room ({:?}), stopping websocket connection",
-            err
+            "failed to send id to game room with address {} ({:?}), stopping websocket connection",
+            game_room_address, err
         );
         return;
     }
@@ -104,17 +108,7 @@ async fn handle_connection(
     let mut request_counter = 0;
 
     let send_sdp_answer = incoming.try_for_each(|message| {
-        debug!("Received an answer from {}: {}", game_room_address, message);
-        let sdp_answer = message.to_text().unwrap();
-        let sdp_answer: SdpMessage = serde_json::from_str(sdp_answer).unwrap();
-        request_map
-            .lock()
-            .unwrap()
-            .get(&sdp_answer.id)
-            .unwrap()
-            .try_send(sdp_answer.data)
-            .unwrap();
-        future::ok(())
+        handle_game_message(message, game_room_address, request_map.clone())
     });
 
     let receive_sdp_offers = message_receiver
@@ -142,7 +136,6 @@ async fn handle_connection(
         &id, &game_room_address
     );
     room_map.lock().await.remove(&id);
-    span.exit();
 }
 
 fn generate_id() -> String {
@@ -169,7 +162,7 @@ async fn send_id_to_game_room(
         })
 }
 
-pub fn parse_message<'a, T>(message: &'a Message) -> Result<T, Error>
+fn parse_message<'a, T>(message: &'a Message) -> Result<T, Error>
 where
     T: de::Deserialize<'a>,
 {
@@ -183,4 +176,24 @@ where
             message
         ))
     })
+}
+
+fn handle_game_message<E>(
+    message: Message,
+    game_room_address: SocketAddr,
+    request_map: RequestMap,
+) -> Ready<Result<(), E>> {
+    debug!(
+        "Received a sdp answer from {}: {}",
+        game_room_address, message
+    );
+    let sdp_answer: SdpMessage = parse_message(&message).unwrap();
+    request_map
+        .lock()
+        .unwrap()
+        .get(&sdp_answer.id)
+        .unwrap()
+        .try_send(sdp_answer.data)
+        .unwrap();
+    future::ok(())
 }
