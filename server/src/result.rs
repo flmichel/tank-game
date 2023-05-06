@@ -51,6 +51,8 @@ impl Error {
 #[derive(Debug)]
 pub enum ErrorKind {
     ConfigurationError,
+    ParsingError,
+    NetworkError,
     StartupError,
     HttpError(StatusCode),
 }

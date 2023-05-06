@@ -1,20 +1,24 @@
 use crate::{
     configuration::ApplicationSettings,
-    result::{Error, ErrorKind::ConfigurationError},
+    result::{
+        Error,
+        ErrorKind::{ConfigurationError, NetworkError, ParsingError},
+    },
 };
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use futures_channel::mpsc::{unbounded, UnboundedSender};
-use futures_util::{future, pin_mut, stream::TryStreamExt, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
+use futures_util::{future, pin_mut, stream::TryStreamExt, Future, SinkExt, StreamExt};
+use serde::{de, Deserialize, Serialize};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc::Sender,
     sync::Mutex,
+    task::yield_now,
 };
-use tokio_tungstenite::tungstenite::Message;
-use tracing::{event, span, Level};
+use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
+use tracing::{debug, error, span, Level};
 
 pub type Tx = UnboundedSender<SdpOffer>;
 pub type RoomMap = Arc<Mutex<HashMap<String, Tx>>>;
@@ -54,11 +58,10 @@ pub async fn start_game_application(
 
     // Let's spawn the handling of each connection in a separate task.
     while let Ok((stream, game_room_address)) = listener.accept().await {
-        tokio::spawn(handle_connection(
-            room_map.clone(),
-            stream,
-            game_room_address,
-        ));
+        tokio::spawn(async {
+            handle_connection(room_map.clone(), stream, game_room_address).await;
+            yield_now().await;
+        });
     }
     Ok(())
 }
@@ -69,10 +72,9 @@ async fn handle_connection(
     game_room_address: SocketAddr,
 ) {
     let id = generate_id();
-    let _span = span!(Level::INFO, "game room", id);
+    let span = span!(Level::INFO, "game room", id).entered();
 
-    event!(
-        Level::INFO,
+    debug!(
         "Incoming TCP connection from the address {}",
         game_room_address
     );
@@ -80,39 +82,30 @@ async fn handle_connection(
     let mut ws_stream = tokio_tungstenite::accept_async(raw_stream)
         .await
         .expect("Error during the websocket handshake occurred");
-    println!(
+    debug!(
         "WebSocket connection established with the address: {}",
         game_room_address
     );
 
-    let id = generate_id();
-    let (tx, rx) = unbounded();
-    room_map.lock().await.insert(id.clone(), tx);
+    let (message_sender, message_receiver) = unbounded();
+    room_map.lock().await.insert(id.clone(), message_sender);
 
-    println!(
-        "message sent: {}",
-        serde_json::to_string(&GameMessage::RoomId(id.clone())).unwrap()
-    );
-
-    ws_stream
-        .send(Message::text(
-            serde_json::to_string(&GameMessage::RoomId(id.clone())).unwrap(),
-        ))
-        .await
-        .unwrap();
+    if let Err(err) = send_id_to_game_room(&mut ws_stream, id.clone()).await {
+        error!(
+            "failed to send id to game room ({:?}), stopping websocket connection",
+            err
+        );
+        return;
+    }
 
     let (outgoing, incoming) = ws_stream.split();
 
     let request_map = RequestMap::new(std::sync::Mutex::new(HashMap::new()));
     let mut request_counter = 0;
 
-    let send_sdp_answer = incoming.try_for_each(|msg| {
-        println!(
-            "Received an answer from {}: {}",
-            game_room_address,
-            msg.to_text().unwrap()
-        );
-        let sdp_answer = msg.to_text().unwrap();
+    let send_sdp_answer = incoming.try_for_each(|message| {
+        debug!("Received an answer from {}: {}", game_room_address, message);
+        let sdp_answer = message.to_text().unwrap();
         let sdp_answer: SdpMessage = serde_json::from_str(sdp_answer).unwrap();
         request_map
             .lock()
@@ -124,7 +117,7 @@ async fn handle_connection(
         future::ok(())
     });
 
-    let receive_sdp_offers = rx
+    let receive_sdp_offers = message_receiver
         .map(|request| {
             println!("offer recieved by server communicator");
             request_map
@@ -144,8 +137,12 @@ async fn handle_connection(
     pin_mut!(send_sdp_answer, receive_sdp_offers);
     future::select(send_sdp_answer, receive_sdp_offers).await;
 
-    println!("{} disconnected", &game_room_address);
+    debug!(
+        "the room {} from the address {} was disconnected",
+        &id, &game_room_address
+    );
     room_map.lock().await.remove(&id);
+    span.exit();
 }
 
 fn generate_id() -> String {
@@ -153,4 +150,37 @@ fn generate_id() -> String {
     let id = base64_url::encode(&random_bytes);
     print!("{}", id);
     return id;
+}
+
+async fn send_id_to_game_room(
+    ws_stream: &mut WebSocketStream<TcpStream>,
+    id: String,
+) -> Result<(), Error> {
+    debug!("sending message to game room containing the id: {}", &id);
+    ws_stream
+        .send(Message::text(
+            serde_json::to_string(&GameMessage::RoomId(id)).map_err(|err| {
+                Error::from(err, ParsingError).explain("failed to parse the Game Message")
+            })?,
+        ))
+        .await
+        .map_err(|err| {
+            Error::from(err, NetworkError).explain("failed send id message to the game room")
+        })
+}
+
+pub fn parse_message<'a, T>(message: &'a Message) -> Result<T, Error>
+where
+    T: de::Deserialize<'a>,
+{
+    let message = message.to_text().map_err(|err| {
+        Error::from(err, ParsingError)
+            .explain(format!("failed to convert message {} to string", message))
+    })?;
+    serde_json::from_str(message).map_err(|err| {
+        Error::from(err, ParsingError).explain(format!(
+            "failed to convert message {} to some struct",
+            message
+        ))
+    })
 }
