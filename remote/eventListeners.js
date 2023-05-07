@@ -37,11 +37,9 @@ export default function addAllEventListeners() {
     pc.createOffer()
       .then((d) => pc.setLocalDescription(d))
       .catch(log);
-    console.log("ouiii");
   };
 
   state.webRTC.pc.onicecandidate = function (e) {
-    console.log("hello ice");
     console.log(pc.localDescription);
     btoa(JSON.stringify(pc.localDescription));
   };
