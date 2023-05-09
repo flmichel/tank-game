@@ -1,8 +1,11 @@
+import { PendingRequests } from '../api/fetch';
+import configuration from '../configuration';
+
 export interface State {
     route: string;
     authentication: Authentication;
     game: Game;
-    pendingRequests: Request[],
+    pendingRequests: PendingRequests;
 };
 
 export interface Authentication {
@@ -17,8 +20,6 @@ export enum AuthenticationState {
     LoggingIn,
 }
 
-interface Request {}
-
 interface Login extends Request {
     username: string;
     password: string;
@@ -31,8 +32,11 @@ interface Register extends Request {
 }
 
 interface Game {
+    isChannelOpen: boolean;
+    roomId: string | null;
     channel: RTCDataChannel | null;
     sdpOffer: string | null;
+    peerConnection: RTCPeerConnection;
 }
 
 export let state: State = {
@@ -40,8 +44,8 @@ export let state: State = {
     authentication: {
         authenticationState: AuthenticationState.LoggedOut, 
     },
-    gameChannel: null,
-    pendingRequests: [],
+    game: { isChannelOpen: false, roomId: null, channel: null, sdpOffer: null, peerConnection: configuration.rtcPeerConnection },
+    pendingRequests: new PendingRequests(),
 }
 
 

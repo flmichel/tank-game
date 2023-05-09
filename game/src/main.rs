@@ -230,7 +230,7 @@ async fn main() -> Result<(), String> {
                 MessageToGame::RoomId(id) => {
                     println!("creating qrcode with room_id {}", id);
                     room_code = RoomCode::new(
-                        format!("http://192.168.0.106:5500/?room-id={}", id).to_owned(),
+                        format!("http://192.168.0.103:8080/?room-id={}", id).to_owned(),
                     );
                 }
                 MessageToGame::Input(Input::A) => {

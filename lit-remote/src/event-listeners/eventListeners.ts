@@ -1,4 +1,5 @@
-import { ConfigureGameChannel, RouteBack, trigger } from "../actions/actions";
+import { RouteBack, trigger } from "../actions/actions";
+import { ConfigureGameChannel } from "../actions/webrtc";
 import configuration from "../configuration";
 import { state } from "../state/state";
 
@@ -14,35 +15,14 @@ export default function addAllEventListeners() {
     if (roomId !== null) {
       trigger(new ConfigureGameChannel(roomId));
 
-      let peerConnection = configuration.rtcPeerConnection
-      state.gameChannel = peerConnection.createDataChannel("channel");
+      /*let peerConnection = state.game.peerConnection
+      state.game.channel = peerConnection.createDataChannel("channel");
       
-      configuration.rtcPeerConnection.onicecandidate = (event) => {
+      peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          trigger(Actions.AddSdpOffer, pc.localDescription);
+          trigger(new S);
         }
-      };
+      };*/
     }
-
-    let pc = state.webRTC.pc;
-
-    state.webRTC.sendChannel = pc.createDataChannel("channel");
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        trigger(Actions.AddSdpOffer, pc.localDescription);
-      }
-    };
-
-    pc.onnegotiationneeded = (e) =>
-      pc.createOffer().then((d) => pc.setLocalDescription(d));
-
-    /*const urlParams = new URLSearchParams(window.location.search);
-    console.log(urlParams);
-    let roomId = urlParams.get("room-id");
-    if (roomId !== null) {
-      trigger(Actions.AddRoomId, roomId);
-    }
-    console.log("onLoad");*/
   };
 }

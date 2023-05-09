@@ -2,7 +2,7 @@ import {html, css, LitElement} from 'lit';
 import { customElement, property} from 'lit/decorators.js';
 import { State, state } from '../state/state';
 import './navbar';
-import './page/homepage';
+import './pages/homepage';
 
 export function test() {
     console.log("Testing");
@@ -25,7 +25,7 @@ export class View extends LitElement {
 
   renderPage(route: string) {
     switch (route) {
-      case '/': return <homepage></homepage>;
+      case '/': return html`<home-page></home-page>`;
     }
   }
 
