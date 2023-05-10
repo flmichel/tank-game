@@ -1,3 +1,4 @@
+import { Point } from '../actions/remote';
 import { PendingRequests } from '../api/fetch';
 import configuration from '../configuration';
 
@@ -5,6 +6,7 @@ export interface State {
     route: string;
     authentication: Authentication;
     game: Game;
+    remote: Remote
     pendingRequests: PendingRequests;
 };
 
@@ -39,11 +41,21 @@ interface Game {
     peerConnection: RTCPeerConnection;
 }
 
+interface Remote {
+    leftController: LeftController;
+    rightController: null;
+}
+
+interface LeftController {
+    startingPoint: Point | null;
+}
+
 export let state: State = {
     route: '/',
     authentication: {
         authenticationState: AuthenticationState.LoggedOut, 
     },
+    remote: { leftController: { startingPoint: null}, rightController: null },
     game: { isChannelOpen: false, roomId: null, channel: null, sdpOffer: null, peerConnection: configuration.rtcPeerConnection },
     pendingRequests: new PendingRequests(),
 }

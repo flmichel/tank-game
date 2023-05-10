@@ -5,6 +5,7 @@ use serde::Deserialize;
 pub enum MessageToGame {
     Input(Input),
     RoomId(String),
+    PlayerDirection(f64),
 }
 
 #[derive(Deserialize)]

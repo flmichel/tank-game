@@ -6,14 +6,15 @@ export class PendingRequests {
     }
 
     async executeAll() {
-        this.requestHandlers.forEach((requestHandler) => {
-            this.process(requestHandler)
-        });
+        while (this.requestHandlers.length > 0) {
+            this.process(this.requestHandlers.pop()!);
+        }
     }
 
     async process(requestHandler: RequestHandler) {
         let request = requestHandler.formRequest();
-        const response = await fetch("https://8c83-188-61-172-167.eu.ngrok.io" + request.path,
+        console.log("Execute request: ", request);
+        const response = await fetch("http://127.0.0.1:8000" + request.path,
         {
           method: request.method,
           mode: "cors",

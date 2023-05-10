@@ -241,6 +241,10 @@ async fn main() -> Result<(), String> {
                     player.speed = PLAYER_MOVEMENT_SPEED;
                     player.direction = Direction::Left;
                 }
+                MessageToGame::PlayerDirection(_) => {
+                    player.speed = PLAYER_MOVEMENT_SPEED;
+                    player.direction = Direction::Right;
+                }
             }
         }
 

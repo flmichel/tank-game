@@ -6,6 +6,10 @@ export interface Action {
     execute(): void;
 }
 
+export class Reload implements Action {
+    execute(): void {}
+}
+
 export class Route implements Action {
     route: string;
 
@@ -34,6 +38,7 @@ export class RouteBack implements Action {
 export function trigger(action: Action) {
     action.execute();
     console.log("triggered action:", action);
+    state.pendingRequests.executeAll();
     view.state = state;
     view.requestUpdate();
 }

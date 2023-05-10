@@ -14,15 +14,6 @@ export default function addAllEventListeners() {
     let roomId = urlParams.get("room-id");
     if (roomId !== null) {
       trigger(new ConfigureGameChannel(roomId));
-
-      /*let peerConnection = state.game.peerConnection
-      state.game.channel = peerConnection.createDataChannel("channel");
-      
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          trigger(new S);
-        }
-      };*/
     }
   };
 }

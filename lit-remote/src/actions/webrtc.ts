@@ -1,7 +1,7 @@
 import { SdpOffer } from "../api/webrtc";
 import configuration from "../configuration";
 import { state } from "../state/state";
-import { Action } from "./actions";
+import { Action, Reload, trigger } from "./actions";
 
 export class ConfigureGameChannel implements Action {
     gameRoomId: string;
@@ -12,16 +12,25 @@ export class ConfigureGameChannel implements Action {
     
     execute(): void {
         state.game.roomId = this.gameRoomId;
-        let peerConnection = configuration.rtcPeerConnection
+        let peerConnection = state.game.peerConnection;
         state.game.channel = peerConnection.createDataChannel("channel");
+        console.log("channel created");
       
         peerConnection.onicecandidate = (event) => {
+            console.log("onicecandidate");
             if (event.candidate && state.game.sdpOffer === null) {
                 console.log("got plain offer", peerConnection.localDescription);
                 let sdpOffer = btoa(JSON.stringify(peerConnection.localDescription));
+                state.game.sdpOffer = sdpOffer;
                 state.pendingRequests.add(new SdpOffer(sdpOffer, this.gameRoomId));
+                trigger(new Reload())
             }
         }
+
+        peerConnection.onnegotiationneeded = (e) =>
+            peerConnection.createOffer().then((d) => peerConnection.setLocalDescription(d));
+
+        console.log("peerConnection", peerConnection);
     }
 }
 

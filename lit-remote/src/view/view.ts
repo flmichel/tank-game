@@ -3,6 +3,7 @@ import { customElement, property} from 'lit/decorators.js';
 import { State, state } from '../state/state';
 import './navbar';
 import './pages/homepage';
+import './pages/canvas-touch'
 
 export function test() {
     console.log("Testing");
@@ -25,7 +26,10 @@ export class View extends LitElement {
 
   renderPage(route: string) {
     switch (route) {
-      case '/': return html`<home-page></home-page>`;
+      case '/': return html`
+        <home-page></home-page>
+        <canvas-touch></canvas-touch>
+        `;
     }
   }
 
