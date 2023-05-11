@@ -21,7 +21,8 @@ export class SendMovementDirection implements Action {
     }
     
     execute(): void {
-        let radianDirection = state.remote.leftController.startingPoint?.getDirectionInRadians(this.currentPoint);
+        if (!state.remote.leftController.startingPoint) return;
+        let radianDirection = state.remote.leftController.startingPoint!.getDirectionInRadians(this.currentPoint);
         state.game.channel!.send(JSON.stringify(radianDirection));
     }
 }
@@ -39,5 +40,5 @@ export class Point {
         const deltaX = other.x - this.x;
         const deltaY = other.y - this.y;
         return Math.atan2(deltaY, deltaX);
-      }
+    }
 }

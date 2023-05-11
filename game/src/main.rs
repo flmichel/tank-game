@@ -23,21 +23,16 @@ use server_communicator::{MessageToServer, SdpMessage, ServerCommunicator};
 use std::time::Duration;
 use tokio::spawn;
 
-const PLAYER_MOVEMENT_SPEED: i32 = 20;
+const PLAYER_MOVEMENT_SPEED: f64 = 5.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-}
+#[derive(Debug, Clone, Copy)]
+struct Direction(f64);
 
 #[derive(Debug)]
 struct Player {
     position: Point,
     sprite: Rect,
-    speed: i32,
+    speed: f64,
     direction: Direction,
 }
 
@@ -78,21 +73,9 @@ fn render(
 // WARNING: Calling this function too often or at a variable speed will cause the player's speed
 // to be unpredictable!
 fn update_player(player: &mut Player) {
-    use self::Direction::*;
-    match player.direction {
-        Left => {
-            player.position = player.position.offset(-player.speed, 0);
-        }
-        Right => {
-            player.position = player.position.offset(player.speed, 0);
-        }
-        Up => {
-            player.position = player.position.offset(0, -player.speed);
-        }
-        Down => {
-            player.position = player.position.offset(0, player.speed);
-        }
-    }
+    let x = (player.speed * player.direction.0.cos()) as i32;
+    let y = (player.speed * player.direction.0.sin()) as i32;
+    player.position = player.position.offset(x, y);
 }
 
 #[tokio::main]
@@ -148,8 +131,8 @@ async fn main() -> Result<(), String> {
     let mut player = Player {
         position: Point::new(0, 0),
         sprite: Rect::new(0, 0, 26, 36),
-        speed: 0,
-        direction: Direction::Right,
+        speed: 0.0,
+        direction: Direction(0.0),
     };
 
     let mut event_pump = sdl_context.event_pump()?;
@@ -157,7 +140,6 @@ async fn main() -> Result<(), String> {
 
     let mut room_code = RoomCode::new("Hello World".to_owned());
     'running: loop {
-        // Handle events
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -166,60 +148,6 @@ async fn main() -> Result<(), String> {
                     ..
                 } => {
                     break 'running;
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::Left),
-                    repeat: false,
-                    ..
-                } => {
-                    player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction::Left;
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::Right),
-                    repeat: false,
-                    ..
-                } => {
-                    player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction::Right;
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::Up),
-                    repeat: false,
-                    ..
-                } => {
-                    player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction::Up;
-                }
-                Event::KeyDown {
-                    keycode: Some(Keycode::Down),
-                    repeat: false,
-                    ..
-                } => {
-                    player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction::Down;
-                }
-                Event::KeyUp {
-                    keycode: Some(Keycode::Left),
-                    repeat: false,
-                    ..
-                }
-                | Event::KeyUp {
-                    keycode: Some(Keycode::Right),
-                    repeat: false,
-                    ..
-                }
-                | Event::KeyUp {
-                    keycode: Some(Keycode::Up),
-                    repeat: false,
-                    ..
-                }
-                | Event::KeyUp {
-                    keycode: Some(Keycode::Down),
-                    repeat: false,
-                    ..
-                } => {
-                    player.speed = 0;
                 }
                 _ => {}
             }
@@ -233,17 +161,10 @@ async fn main() -> Result<(), String> {
                         format!("http://192.168.0.103:8080/?room-id={}", id).to_owned(),
                     );
                 }
-                MessageToGame::Input(Input::A) => {
+                MessageToGame::Input(_) => {}
+                MessageToGame::PlayerDirection(direction) => {
                     player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction::Right;
-                }
-                MessageToGame::Input(Input::B) => {
-                    player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction::Left;
-                }
-                MessageToGame::PlayerDirection(_) => {
-                    player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction::Right;
+                    player.direction = Direction(direction);
                 }
             }
         }

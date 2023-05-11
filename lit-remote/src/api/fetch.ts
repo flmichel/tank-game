@@ -14,7 +14,8 @@ export class PendingRequests {
     async process(requestHandler: RequestHandler) {
         let request = requestHandler.formRequest();
         console.log("Execute request: ", request);
-        const response = await fetch("http://127.0.0.1:8000" + request.path,
+        //const response = await fetch("http://127.0.0.1:8000" + request.path,
+        const response = await fetch("https://6267-188-61-172-167.ngrok-free.app" + request.path,
         {
           method: request.method,
           mode: "cors",
