@@ -123,7 +123,7 @@ impl PlayersConnector {
         receiver: UnboundedReceiver<SdpMessage>,
     ) -> Self {
         let mut m = MediaEngine::default();
-        let mut fastest_codec = RTCRtpCodecParameters {
+        let fastest_codec = RTCRtpCodecParameters {
             capability: RTCRtpCodecCapability {
                 mime_type: MIME_TYPE_OPUS.to_owned(),
                 clock_rate: 48000,
@@ -181,13 +181,6 @@ impl PlayersConnector {
                     Ok(()) => println!("The message was successfully sent"),
                     Err(err) => println!("failed to send message {}", err.to_string()),
                 }
-
-                let sender_to_game = self.sender_to_game.clone();
-                /*spawn(async move {
-                    let mut remote_communicator =
-                        RemoteCommunicator::new(peer_connection, sender_to_game);
-                    remote_communicator.start().await
-                });*/
             }
         }
     }

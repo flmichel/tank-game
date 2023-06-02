@@ -157,7 +157,7 @@ pub async fn start_peer_connection(offer: String, sender: Sender<String>) {
     sender.send(answer).await.expect("failed to send answer");
 }
 
-pub fn listen(peer_connection: RTCPeerConnection, sender: Sender<String>) {
+pub fn listen(peer_connection: RTCPeerConnection) {
     peer_connection.on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
         println!("Peer Connection State has changed: {s}");
 

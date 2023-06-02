@@ -1,22 +1,18 @@
 use anyhow::Result;
 use std::{time::Duration, sync::Arc};
 
-use futures_channel::mpsc::UnboundedSender;
 use webrtc::{peer_connection::{RTCPeerConnection, peer_connection_state::RTCPeerConnectionState}, data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel}};
 
-use crate::game::MessageToGame;
 
 pub struct RemoteCommunicator {
     peer_connection: RTCPeerConnection,
-    sender_to_game: UnboundedSender<MessageToGame>,
 }
 
 impl RemoteCommunicator {
-    pub fn new(peer_connection: RTCPeerConnection, sender_to_game: UnboundedSender<MessageToGame>) -> Self {
+    pub fn new(peer_connection: RTCPeerConnection) -> Self {
         print!("new player could connect");
         Self {
             peer_connection,
-            sender_to_game,
         }
     }
 

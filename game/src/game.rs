@@ -1,15 +1,10 @@
 use serde::Deserialize;
 
+use crate::remotes::RemoteInput;
+
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum MessageToGame {
-    Input(Input),
+    RemoteInput(RemoteInput),
     RoomId(String),
-    PlayerDirection(f64),
-}
-
-#[derive(Deserialize)]
-pub enum Input {
-    A,
-    B,
 }

@@ -1,13 +1,7 @@
-mod controllers;
-mod game;
-mod players_connector;
-mod remote_communicator;
-mod room_code;
-mod server_communicator;
-mod signal;
-
 use futures_channel::mpsc::unbounded;
-use game::{Input, MessageToGame};
+use game::game::MessageToGame;
+use game::remotes::{GameInput, RemoteInput};
+use game::{players_connector, room_code, server_communicator};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -19,7 +13,7 @@ use anyhow::Result;
 use image::LoadTexture;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
-use server_communicator::{MessageToServer, SdpMessage, ServerCommunicator};
+use server_communicator::ServerCommunicator;
 use std::time::Duration;
 use tokio::spawn;
 
@@ -49,7 +43,9 @@ fn render(
     let squares = room_code.get_qr_code_squares(10);
     squares.iter().for_each(|(square, color)| {
         canvas.set_draw_color(*color);
-        canvas.fill_rect(*square).unwrap();
+        let mut square = square.clone();
+        square.offset(10, 10);
+        canvas.fill_rect(square).unwrap();
     });
 
     let (width, height) = canvas.output_size()?;
@@ -94,16 +90,9 @@ async fn main() -> Result<(), String> {
     let server_communicator = ServerCommunicator::new(
         sender_to_game,
         sender_to_player_connector,
-        //receiver_server,
         "ws://localhost:5000",
     );
     spawn(async move { server_communicator.start(receiver_server).await });
-
-    let answer = MessageToServer::SdpAnswer(SdpMessage {
-        data: "hello".to_owned(),
-        id: 23,
-    });
-    //sender_to_server.unbounded_send(answer).unwrap();
 
     let sdl_context = sdl2::init().expect("failed to create context");
     let video_subsystem = sdl_context.video()?;
@@ -158,14 +147,17 @@ async fn main() -> Result<(), String> {
                 MessageToGame::RoomId(id) => {
                     println!("creating qrcode with room_id {}", id);
                     room_code = RoomCode::new(
-                        format!("http://192.168.0.103:8080/?room-id={}", id).to_owned(),
+                        format!("http://192.168.0.107:8080/?room-id={}", id).to_owned(),
                     );
                 }
-                MessageToGame::Input(_) => {}
-                MessageToGame::PlayerDirection(direction) => {
+                MessageToGame::RemoteInput(RemoteInput::GameInput(GameInput::Move(direction))) => {
                     player.speed = PLAYER_MOVEMENT_SPEED;
                     player.direction = Direction(direction);
                 }
+                MessageToGame::RemoteInput(RemoteInput::GameInput(GameInput::Stop)) => {
+                    player.speed = 0.0;
+                }
+                MessageToGame::RemoteInput(_) => {}
             }
         }
 

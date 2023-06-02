@@ -10,9 +10,6 @@
       "path": "remote"
     },
     {
-      "path": "lit-remote"
-    },
-    {
       "path": "server-api"
     },
     {
@@ -24,6 +21,9 @@
   ],
   "settings": {
     "liveServer.settings.multiRootWorkspaceName": "lit-remote",
-    "html.format.wrapLineLength": 150
+    "html.format.wrapLineLength": 150,
+    "rust-analyzer.linkedProjects": [
+      "./Cargo.toml"
+    ]
   },
 }
