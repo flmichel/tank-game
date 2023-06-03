@@ -1,6 +1,6 @@
 use futures_channel::mpsc::unbounded;
 use game::game::MessageToGame;
-use game::remotes::{GameInput, RemoteInput};
+use game::remotes::{GameInput, PlayerInput, RemoteInput};
 use game::{players_connector, room_code, server_communicator};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
@@ -32,12 +32,11 @@ struct Player {
 
 fn render(
     canvas: &mut WindowCanvas,
-    color: Color,
     texture: &Texture,
     player: &Player,
     room_code: &RoomCode,
 ) -> Result<(), String> {
-    canvas.set_draw_color(color);
+    canvas.set_draw_color(Color::RGB(173, 216, 230));
     canvas.clear();
 
     let squares = room_code.get_qr_code_squares(10);
@@ -102,7 +101,8 @@ async fn main() -> Result<(), String> {
     let _image_context = image::init(InitFlag::PNG | InitFlag::JPG).expect("failed to get image");
 
     let window = video_subsystem
-        .window("game tutorial", 800, 600)
+        .window("tank game", 800, 600)
+        .fullscreen_desktop() // Set fullscreen mode
         .position_centered()
         .build()
         .expect("could not initialize video subsystem");
@@ -125,7 +125,6 @@ async fn main() -> Result<(), String> {
     };
 
     let mut event_pump = sdl_context.event_pump()?;
-    let mut i = 0;
 
     let mut room_code = RoomCode::new("Hello World".to_owned());
     'running: loop {
@@ -147,36 +146,36 @@ async fn main() -> Result<(), String> {
                 MessageToGame::RoomId(id) => {
                     println!("creating qrcode with room_id {}", id);
                     room_code = RoomCode::new(
-                        format!("http://192.168.0.107:8080/?room-id={}", id).to_owned(),
+                        format!("http://192.168.0.108:8080/?room-id={}", id).to_owned(),
                     );
                 }
-                MessageToGame::RemoteInput(RemoteInput::GameInput(GameInput::Move(direction))) => {
-                    player.speed = PLAYER_MOVEMENT_SPEED;
-                    player.direction = Direction(direction);
+                MessageToGame::PlayerInput(player_input) => {
+                    handle_player_input(player_input, &mut player);
                 }
-                MessageToGame::RemoteInput(RemoteInput::GameInput(GameInput::Stop)) => {
-                    player.speed = 0.0;
-                }
-                MessageToGame::RemoteInput(_) => {}
             }
         }
 
-        // Update
-        i = (i + 1) % 255;
         update_player(&mut player);
 
         // Render
-        render(
-            &mut canvas,
-            Color::RGB(i, 64, 255 - i),
-            &texture,
-            &player,
-            &room_code,
-        )?;
+        render(&mut canvas, &texture, &player, &room_code)?;
 
         // Time management!
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
     }
 
     Ok(())
+}
+
+fn handle_player_input(player_input: PlayerInput, player: &mut Player) {
+    match player_input.remote_input {
+        RemoteInput::GameInput(GameInput::Move(direction)) => {
+            player.speed = PLAYER_MOVEMENT_SPEED;
+            player.direction = Direction(direction);
+        }
+        RemoteInput::GameInput(GameInput::Stop) => {
+            player.speed = 0.0;
+        }
+        _ => {}
+    }
 }

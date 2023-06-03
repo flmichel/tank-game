@@ -1,12 +1,16 @@
 use serde::Deserialize;
 
+pub struct PlayerInput {
+    pub player_id: u32,
+    pub remote_input: RemoteInput,
+}
+
 #[derive(Deserialize)]
 #[serde(untagged)]
-
 pub enum RemoteInput {
     GameInput(GameInput),
     ReadyToPlay,
-    SetUsername(String),
+    NewPlayer(String),
 }
 
 #[derive(Deserialize)]

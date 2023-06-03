@@ -15,14 +15,11 @@ export class PendingRequests {
     let request = requestHandler.formRequest();
     console.log("Execute request: ", request);
     //const response = await fetch("http://127.0.0.1:8000" + request.path,
-    const response = await fetch(
-      "https://6edd-188-61-172-167.ngrok-free.app" + request.path,
-      {
-        method: request.method,
-        mode: "cors",
-        body: JSON.stringify(request.body),
-      }
-    );
+    const response = await fetch("https://francois.serveo.net" + request.path, {
+      method: request.method,
+      mode: "cors",
+      body: JSON.stringify(request.body),
+    });
 
     if (!response.ok) {
       const errorResponse = await response.json();

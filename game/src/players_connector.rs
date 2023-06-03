@@ -70,8 +70,10 @@ impl WebRTCUtil {
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
                     println!("Message from DataChannel '{d_label}': '{msg_str}'");
-                    let message: MessageToGame = serde_json::from_str(&msg_str).unwrap();
-                    sender_to_game.unbounded_send(message).unwrap();
+                    let message: String = serde_json::from_str(&msg_str).unwrap();
+                    sender_to_game
+                        .unbounded_send(MessageToGame::RoomId(message))
+                        .unwrap();
                     Box::pin(async {})
                 }));
             })

@@ -29,25 +29,18 @@ pub enum MessageToServer {
 pub struct ServerCommunicator {
     sender_to_game: UnboundedSender<MessageToGame>,
     sender_to_player_connector: UnboundedSender<SdpMessage>,
-    //receiver: UnboundedReceiver<MessageToServer>,
     url: String,
 }
 
 impl ServerCommunicator {
-    /*pub fn builder() -> ServerCommunicatorBuilder {
-        ServerCommunicatorBuilder::default()
-    }*/
-
     pub fn new<S: Into<String>>(
         sender_to_game: UnboundedSender<MessageToGame>,
         sender_to_player_connector: UnboundedSender<SdpMessage>,
-        //receiver: UnboundedReceiver<MessageToServer>,
         url: S,
     ) -> Self {
         Self {
             sender_to_game,
             sender_to_player_connector,
-            //receiver: receiver,
             url: url.into(),
         }
     }
@@ -86,51 +79,5 @@ impl ServerCommunicator {
 
         pin_mut!(handle_server_messages, handle_answer);
         future::select(handle_server_messages, handle_answer).await;
-        //pin_mut!(handle_server_messages);
-        //handle_server_messages.await;
     }
 }
-
-/*
-#[derive(Default)]
-pub struct ServerCommunicatorBuilder {
-    sender_to_game: Option<Sender<MessageToGame>>,
-    sender_to_player_connector: Option<Sender<SdpMessage>>,
-    receiver: Option<Receiver<MessageToServer>>,
-    url: Option<String>,
-}
-
-impl ServerCommunicatorBuilder {
-    pub fn sender_to_game(&mut self, mut sender_to_game: Sender<MessageToGame>) -> &mut Self {
-        self.sender_to_game = Some(sender_to_game);
-        self
-    }
-
-    pub fn sender_to_player_connector(
-        &mut self,
-        mut sender_to_player_connector: Sender<SdpMessage>,
-    ) -> &mut Self {
-        self.sender_to_player_connector = Some(sender_to_player_connector);
-        self
-    }
-
-    pub fn receiver(&mut self, mut receiver: Receiver<MessageToServer>) -> &mut Self {
-        self.receiver = Some(receiver);
-        self
-    }
-
-    pub fn url<S: Into<String>>(&mut self, url: S) -> &mut Self {
-        self.url = Some(url.into());
-        self
-    }
-
-    pub fn build(&mut self) -> Option<ServerCommunicator> {
-        Some(ServerCommunicator {
-            sender_to_game: self.sender_to_game?,
-            sender_to_player_connector: self.sender_to_player_connector?,
-            receiver: self.receiver?,
-            url: self.url?,
-        })
-    }
-}
-*/
