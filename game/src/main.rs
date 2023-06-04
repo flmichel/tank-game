@@ -1,7 +1,11 @@
 use futures_channel::mpsc::unbounded;
-use game::game::MessageToGame;
+use game::components::{Circle, Movement, Player, Position};
+use game::game::{MessageToGame, RoomId};
+use game::game_state::{Phase, State};
 use game::remotes::{GameInput, PlayerInput, RemoteInput};
-use game::{players_connector, room_code, server_communicator};
+use game::renderer::SystemData;
+use game::systems::RetrievePlayerForInputs;
+use game::{players_connector, renderer, room_code, server_communicator};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -14,6 +18,7 @@ use image::LoadTexture;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
 use server_communicator::ServerCommunicator;
+use specs::{Builder, DispatcherBuilder, World, WorldExt};
 use std::time::Duration;
 use tokio::spawn;
 
@@ -22,15 +27,7 @@ const PLAYER_MOVEMENT_SPEED: f64 = 5.0;
 #[derive(Debug, Clone, Copy)]
 struct Direction(f64);
 
-#[derive(Debug)]
-struct Player {
-    position: Point,
-    sprite: Rect,
-    speed: f64,
-    direction: Direction,
-}
-
-fn render(
+/*fn render(
     canvas: &mut WindowCanvas,
     texture: &Texture,
     player: &Player,
@@ -62,16 +59,15 @@ fn render(
     canvas.present();
 
     Ok(())
-}
+}*/
 
-// Update player a fixed amount based on their speed.
-// WARNING: Calling this function too often or at a variable speed will cause the player's speed
-// to be unpredictable!
+/*
 fn update_player(player: &mut Player) {
     let x = (player.speed * player.direction.0.cos()) as i32;
     let y = (player.speed * player.direction.0.sin()) as i32;
     player.position = player.position.offset(x, y);
 }
+*/
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -117,16 +113,10 @@ async fn main() -> Result<(), String> {
         .load_texture("assets/bardo.png")
         .expect("failed to load texture");
 
-    let mut player = Player {
-        position: Point::new(0, 0),
-        sprite: Rect::new(0, 0, 26, 36),
-        speed: 0.0,
-        direction: Direction(0.0),
-    };
+    let mut world = create_world();
 
     let mut event_pump = sdl_context.event_pump()?;
 
-    let mut room_code = RoomCode::new("Hello World".to_owned());
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -141,7 +131,7 @@ async fn main() -> Result<(), String> {
             }
         }
 
-        if let Ok(Some(message)) = receiver_game.try_next() {
+        /*if let Ok(Some(message)) = receiver_game.try_next() {
             match message {
                 MessageToGame::RoomId(id) => {
                     println!("creating qrcode with room_id {}", id);
@@ -153,12 +143,24 @@ async fn main() -> Result<(), String> {
                     handle_player_input(player_input, &mut player);
                 }
             }
+        }*/
+
+        if let Ok(Some(message)) = receiver_game.try_next() {
+            match message {
+                MessageToGame::RoomId(id) => {
+                    let mut game_state = world.write_resource::<State>();
+                    game_state.room_code = RoomCode::new(
+                        format!("http://192.168.0.108:8080/?room-id={}", id.0).to_owned(),
+                    );
+                }
+                MessageToGame::PlayerInput(player_input) => {
+                    world.create_entity().with(player_input).build();
+                }
+            }
         }
 
-        update_player(&mut player);
-
         // Render
-        render(&mut canvas, &texture, &player, &room_code)?;
+        renderer::render(&mut canvas, world.system_data())?;
 
         // Time management!
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
@@ -167,15 +169,27 @@ async fn main() -> Result<(), String> {
     Ok(())
 }
 
-fn handle_player_input(player_input: PlayerInput, player: &mut Player) {
-    match player_input.remote_input {
-        RemoteInput::GameInput(GameInput::Move(direction)) => {
-            player.speed = PLAYER_MOVEMENT_SPEED;
-            player.direction = Direction(direction);
-        }
-        RemoteInput::GameInput(GameInput::Stop) => {
-            player.speed = 0.0;
-        }
-        _ => {}
-    }
+fn create_world() -> World {
+    let mut world = World::new();
+    world.register::<RoomId>();
+    world.register::<PlayerInput>();
+    world.register::<Position>();
+    world.register::<Movement>();
+    world.register::<Circle>();
+    world.register::<Player>();
+
+    let game_state = State {
+        room_code: RoomCode::new("Error, the game could not connect to server".to_owned()),
+        phase: Phase::BeforeNextGame,
+    };
+    world.insert(game_state);
+
+    let mut dispatcher = DispatcherBuilder::new()
+        .with(RetrievePlayerForInputs, "RetrievePlayerForInputs", &[])
+        .build();
+
+    dispatcher.dispatch(&mut world);
+    world.maintain();
+
+    world
 }

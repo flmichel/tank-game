@@ -15,7 +15,7 @@ export class PendingRequests {
     let request = requestHandler.formRequest();
     console.log("Execute request: ", request);
     //const response = await fetch("http://127.0.0.1:8000" + request.path,
-    const response = await fetch("https://francois.serveo.net" + request.path, {
+    const response = await fetch("http://192.168.0.108:8000" + request.path, {
       method: request.method,
       mode: "cors",
       body: JSON.stringify(request.body),

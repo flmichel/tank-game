@@ -1,19 +1,24 @@
 use serde::Deserialize;
+use specs::Component;
+use specs::VecStorage;
+use specs_derive::Component;
 
+#[derive(Component)]
+#[storage(VecStorage)]
 pub struct PlayerInput {
     pub player_id: u32,
     pub remote_input: RemoteInput,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(untagged)]
 pub enum RemoteInput {
     GameInput(GameInput),
-    ReadyToPlay,
-    NewPlayer(String),
+    ConfigurationInput(ConfigurationInput),
+    NoInput,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum GameInput {
     Aim(f64),
@@ -21,4 +26,11 @@ pub enum GameInput {
     Bomb,
     Stop,
     Move(f64),
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConfigurationInput {
+    ReadyToPlay,
+    SetName(String),
 }

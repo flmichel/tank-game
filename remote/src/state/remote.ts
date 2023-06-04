@@ -1,5 +1,3 @@
-import { ControllerId } from "../actions/remote";
-
 export interface Remote {
   movementController: Controller | null;
   actionController: Controller | null;

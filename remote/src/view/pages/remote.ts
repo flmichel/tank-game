@@ -1,14 +1,9 @@
 import { LitElement, html, css } from "lit-element";
 import { customElement, property } from "lit/decorators.js";
-import {
-  CanvasData,
-  ControllerId,
-  SetControllerCenter,
-  SetControllerDirection,
-} from "../../actions/remote";
+import { CanvasData, ControllerId } from "../../actions/remote";
 import { DisplaySettings } from "../../state/state";
 
-@customElement("canvas-touch-2")
+@customElement("remote-canvas")
 export class CanvasTouch extends LitElement {
   static get styles() {
     return css`

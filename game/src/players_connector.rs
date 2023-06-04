@@ -18,6 +18,7 @@ use webrtc::{
 
 use crate::{
     game::MessageToGame,
+    remotes::{PlayerInput, RemoteInput},
     server_communicator::{MessageToServer, SdpMessage},
     signal::{decode, encode},
 };
@@ -39,6 +40,7 @@ impl WebRTCUtil {
         &self,
         offer: String,
         sender_to_game: UnboundedSender<MessageToGame>,
+        player_id: u32,
     ) -> RTCPeerConnection {
         let peer_connection = self
             .api
@@ -69,10 +71,13 @@ impl WebRTCUtil {
                 // Register text message handling
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
-                    println!("Message from DataChannel '{d_label}': '{msg_str}'");
-                    let message: String = serde_json::from_str(&msg_str).unwrap();
+                    println!("Message from DataChannel '{d_label}' {player_id}: '{msg_str}'");
+                    let remote_input: RemoteInput = serde_json::from_str(&msg_str).unwrap();
                     sender_to_game
-                        .unbounded_send(MessageToGame::RoomId(message))
+                        .unbounded_send(MessageToGame::PlayerInput(PlayerInput {
+                            player_id,
+                            remote_input,
+                        }))
                         .unwrap();
                     Box::pin(async {})
                 }));
@@ -164,13 +169,15 @@ impl PlayersConnector {
     }
 
     pub async fn start(&mut self) {
+        let mut next_player_id: u32 = 0;
         loop {
             if let Ok(Some(offer)) = self.receiver.try_next() {
                 println!("got an offer in players_connector");
                 let peer_connection = self
                     .webrtc_util
-                    .start_peer_connection(offer.data, self.sender_to_game.clone())
+                    .start_peer_connection(offer.data, self.sender_to_game.clone(), next_player_id)
                     .await;
+                next_player_id += 1;
                 let answer = self.webrtc_util.create_answer(&peer_connection).await;
                 println!("got an answer in players_connector");
                 let answer = MessageToServer::SdpAnswer(SdpMessage {

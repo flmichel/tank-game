@@ -3,7 +3,7 @@ use futures_util::{future, pin_mut, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use crate::game::MessageToGame;
+use crate::game::{MessageToGame, RoomId};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -65,7 +65,7 @@ impl ServerCommunicator {
                 ServerMessage::RoomId(room_id) => self
                     .sender_to_game
                     .clone()
-                    .start_send(MessageToGame::RoomId(room_id))
+                    .start_send(MessageToGame::RoomId(RoomId(room_id)))
                     .unwrap(),
             }
         });

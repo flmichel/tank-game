@@ -3,8 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { State, state } from "../state/state";
 import "./navbar";
 import "./pages/homepage";
-import "./pages/canvas-touch";
-import "./pages/canvas-touch-2";
+import "./pages/remote";
 
 export function test() {
   console.log("Testing");
@@ -33,8 +32,7 @@ export class View extends LitElement {
       case "/":
         return html`
           <home-page></home-page>
-          <!--<canvas-touch></canvas-touch>-->
-          <canvas-touch-2 .state=${this.state}></canvas-touch-2>
+          <remote-canvas .state=${this.state}></remote-canvas>
         `;
     }
   }
