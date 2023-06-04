@@ -1,3 +1,4 @@
+import { sendStringToGame, sendToGame } from "../api/webrtc";
 import { state } from "../state/state";
 import { Action, trigger } from "./actions";
 
@@ -26,13 +27,13 @@ export class SetControllerDirection implements Action {
       state.remote.leftController.startingPoint!.getDirectionInRadians(
         this.currentPoint
       );
-    state.game.channel!.send(JSON.stringify({ move: radianDirection }));
+    sendToGame({ move: radianDirection });
   }
 }
 
 export class StopController implements Action {
   execute(): void {
-    state.game.channel!.send(JSON.stringify("stop"));
+    sendStringToGame("stop");
   }
 }
 

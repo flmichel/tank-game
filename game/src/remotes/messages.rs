@@ -31,6 +31,7 @@ pub enum GameInput {
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub enum ConfigurationInput {
-    ReadyToPlay,
+    Ready,
+    NotReady,
     SetName(String),
 }

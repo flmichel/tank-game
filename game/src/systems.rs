@@ -1,7 +1,8 @@
-use specs::{Entities, Join, ReadStorage, System, WriteStorage};
+use specs::{Entities, Join, ReadExpect, ReadStorage, System, WriteExpect, WriteStorage};
 
 use crate::{
-    components::Player,
+    components::{Player, ReadyStatus},
+    game_state::{Phase, State},
     remotes::{ConfigurationInput, PlayerInput, RemoteInput},
 };
 
@@ -57,5 +58,42 @@ impl RetrievePlayerForInputs {
             }
         }
         None
+    }
+}
+
+pub struct HandleInputs;
+
+impl<'a> System<'a> for HandleInputs {
+    type SystemData = (WriteStorage<'a, Player>, ReadExpect<'a, State>);
+
+    fn run(&mut self, (players, state): Self::SystemData) {
+        match state.phase {
+            Phase::BeforeNextGame | Phase::BreakInGame => self.handle_configuration_inputs(players),
+            Phase::InGame => {
+                print!("not supported yet");
+            }
+        }
+    }
+}
+
+impl HandleInputs {
+    fn handle_configuration_inputs<'a>(&self, mut players: WriteStorage<'a, Player>) {
+        for mut player in (&mut players).join() {
+            match &player.next_input {
+                RemoteInput::GameInput(_) => print!("not allowded"),
+                RemoteInput::ConfigurationInput(ConfigurationInput::NotReady) => {
+                    player.status = ReadyStatus::NotReady;
+                }
+                RemoteInput::ConfigurationInput(ConfigurationInput::Ready) => {
+                    player.status = ReadyStatus::Ready;
+                }
+                RemoteInput::ConfigurationInput(ConfigurationInput::SetName(name)) => {
+                    player.name = name.to_string();
+                }
+                RemoteInput::NoInput => {
+                    print!("nothing to do")
+                }
+            }
+        }
     }
 }

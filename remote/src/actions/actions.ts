@@ -37,6 +37,5 @@ export function trigger(action: Action) {
   action.execute();
   console.log("triggered action:", action);
   state.pendingRequests.executeAll();
-  view.state = state;
-  view.requestUpdate();
+  view.updateState(state);
 }

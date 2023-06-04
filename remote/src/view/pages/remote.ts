@@ -17,7 +17,7 @@ export class CanvasTouch extends LitElement {
   actionData: CanvasData | null = null;
   touchedControllers: Map<ControllerId, number> = new Map();
 
-  @property()
+  @property({ reflect: true })
   state!: DisplaySettings;
 
   render() {

@@ -40,6 +40,18 @@ interface Game {
   channel: RTCDataChannel | null;
   sdpOffer: string | null;
   peerConnection: RTCPeerConnection;
+  state: GameState;
+}
+
+export interface GameState {
+  phase: GamePhase;
+  playerName: string | null;
+  isReady: boolean;
+}
+
+export enum GamePhase {
+  BeforeNextGame,
+  InGame,
 }
 
 interface Remote {
@@ -68,6 +80,11 @@ export let state: State = {
     channel: null,
     sdpOffer: null,
     peerConnection: configuration.rtcPeerConnection,
+    state: {
+      phase: GamePhase.BeforeNextGame,
+      playerName: null,
+      isReady: false,
+    },
   },
   displaySettings: {
     windowHeight: window.innerHeight,

@@ -4,7 +4,7 @@ use game::game::{MessageToGame, RoomId};
 use game::game_state::{Phase, State};
 use game::remotes::{GameInput, PlayerInput, RemoteInput};
 use game::renderer::SystemData;
-use game::systems::RetrievePlayerForInputs;
+use game::systems::{HandleInputs, RetrievePlayerForInputs};
 use game::{players_connector, renderer, room_code, server_communicator};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
@@ -181,11 +181,13 @@ fn create_world() -> World {
     let game_state = State {
         room_code: RoomCode::new("Error, the game could not connect to server".to_owned()),
         phase: Phase::BeforeNextGame,
+        number_of_ready_players: 0,
     };
     world.insert(game_state);
 
     let mut dispatcher = DispatcherBuilder::new()
         .with(RetrievePlayerForInputs, "RetrievePlayerForInputs", &[])
+        .with(HandleInputs, "HandleInputs", &["RetrievePlayerForInputs"])
         .build();
 
     dispatcher.dispatch(&mut world);

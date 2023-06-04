@@ -1,6 +1,6 @@
 use sdl2::{
     pixels::Color,
-    rect::Point,
+    rect::{Point, Rect},
     render::{Texture, WindowCanvas},
 };
 use specs::{Join, ReadExpect, ReadStorage};
@@ -26,6 +26,43 @@ pub fn render(canvas: &mut WindowCanvas, data: SystemData) -> Result<(), String>
         square.offset(10, 10);
         canvas.fill_rect(square).unwrap();
     });
+
+    let mut y = 300; // Calculate starting Y position
+
+    for player in data.3.join() {
+        let circle_color = match player.status {
+            ReadyStatus::Ready => Color::GREEN,
+            ReadyStatus::NotReady => Color::RED,
+        };
+
+        // Calculate the rectangle position and size
+        let rect = Rect::new(75 - 20, y, 40, 40);
+
+        // Draw the filled rectangle
+        canvas.set_draw_color(circle_color);
+        canvas.fill_rect(rect)?;
+
+        // Render player name next to the circle
+        let font_surface = font
+            .render(&player.name)
+            .blended(Color::WHITE)
+            .map_err(|e| e.to_string())?;
+        let font_texture = canvas
+            .texture_creator()
+            .create_texture_from_surface(&font_surface)
+            .map_err(|e| e.to_string())?;
+        let font_rect = font_texture.query();
+        let name_pos = Point::new(110, y + 10);
+
+        canvas.copy(
+            &font_texture,
+            None,
+            Rect::new(name_pos.x, name_pos.y, font_rect.width, font_rect.height),
+        )?;
+
+        // Increment the Y position for the next player
+        y += 60;
+    }
 
     canvas.present();
 

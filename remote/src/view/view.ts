@@ -3,11 +3,8 @@ import { customElement, property } from "lit/decorators.js";
 import { State, state } from "../state/state";
 import "./navbar";
 import "./pages/homepage";
-import "./pages/remote";
-
-export function test() {
-  console.log("Testing");
-}
+import "./game-view";
+import { DisplayState, computeDisplayState } from "../state/displayState";
 
 @customElement("root-view")
 export class View extends LitElement {
@@ -18,21 +15,28 @@ export class View extends LitElement {
   `;
 
   @property()
-  state: State = state;
+  state: DisplayState = computeDisplayState(state);
+
+  updateState(newState: State) {
+    this.state = computeDisplayState(state);
+    this.requestUpdate();
+  }
 
   render() {
     return html` <div>
-      <nav-bar .state=${this.state.authentication}></nav-bar>
+      <nav-bar .state=${this.state}></nav-bar>
+      <game-view .state=${this.state}></game-view>
       ${this.renderPage(this.state.route)}
     </div>`;
   }
 
   renderPage(route: string) {
+    console.log("rerendering page (root view)", this.state.gameState.isReady);
     switch (route) {
       case "/":
         return html`
           <home-page></home-page>
-          <remote-canvas .state=${this.state}></remote-canvas>
+          <game-view .state=${this.state}></game-view>
         `;
     }
   }

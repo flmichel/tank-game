@@ -2,7 +2,7 @@ use sdl2::pixels::Color;
 use specs::{Component, VecStorage};
 use specs_derive::Component;
 
-use crate::remotes::{PlayerInput, RemoteInput};
+use crate::remotes::RemoteInput;
 
 #[derive(Component)]
 #[storage(VecStorage)]
