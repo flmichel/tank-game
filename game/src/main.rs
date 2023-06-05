@@ -17,8 +17,9 @@ use anyhow::Result;
 use image::LoadTexture;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
+use sdl2::ttf::{Font, Sdl2TtfContext};
 use server_communicator::ServerCommunicator;
-use specs::{Builder, DispatcherBuilder, World, WorldExt};
+use specs::{Builder, Dispatcher, DispatcherBuilder, World, WorldExt};
 use std::time::Duration;
 use tokio::spawn;
 
@@ -114,8 +115,12 @@ async fn main() -> Result<(), String> {
         .expect("failed to load texture");
 
     let mut world = create_world();
+    let mut dispatcher = create_dispatcher();
 
     let mut event_pump = sdl_context.event_pump()?;
+
+    let ttf_context = sdl2::ttf::init().unwrap();
+    let font = load_font(&ttf_context);
 
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -131,20 +136,6 @@ async fn main() -> Result<(), String> {
             }
         }
 
-        /*if let Ok(Some(message)) = receiver_game.try_next() {
-            match message {
-                MessageToGame::RoomId(id) => {
-                    println!("creating qrcode with room_id {}", id);
-                    room_code = RoomCode::new(
-                        format!("http://192.168.0.108:8080/?room-id={}", id).to_owned(),
-                    );
-                }
-                MessageToGame::PlayerInput(player_input) => {
-                    handle_player_input(player_input, &mut player);
-                }
-            }
-        }*/
-
         if let Ok(Some(message)) = receiver_game.try_next() {
             match message {
                 MessageToGame::RoomId(id) => {
@@ -159,8 +150,10 @@ async fn main() -> Result<(), String> {
             }
         }
 
+        dispatcher.dispatch(&mut world);
+
         // Render
-        renderer::render(&mut canvas, world.system_data())?;
+        renderer::render(&mut canvas, world.system_data(), &font)?;
 
         // Time management!
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
@@ -185,13 +178,20 @@ fn create_world() -> World {
     };
     world.insert(game_state);
 
-    let mut dispatcher = DispatcherBuilder::new()
+    world
+}
+
+fn create_dispatcher() -> Dispatcher<'static, 'static> {
+    let dispatcher = DispatcherBuilder::new()
         .with(RetrievePlayerForInputs, "RetrievePlayerForInputs", &[])
         .with(HandleInputs, "HandleInputs", &["RetrievePlayerForInputs"])
         .build();
 
-    dispatcher.dispatch(&mut world);
-    world.maintain();
-
-    world
+    dispatcher
+}
+fn load_font(ttf_context: &Sdl2TtfContext) -> Font {
+    // Load a font from a file
+    let font_path = "assets/NotoSans-Medium.ttf";
+    let font_size = 24;
+    ttf_context.load_font(font_path, font_size).unwrap()
 }

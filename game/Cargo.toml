@@ -23,4 +23,4 @@ derive_builder = "0.12"
 [dependencies.sdl2]
 version = "0.35"
 default-features = false
-features = ["image"]
+features = ["image", "ttf"]

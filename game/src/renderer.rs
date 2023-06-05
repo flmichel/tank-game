@@ -2,6 +2,7 @@ use sdl2::{
     pixels::Color,
     rect::{Point, Rect},
     render::{Texture, WindowCanvas},
+    ttf::Font,
 };
 use specs::{Join, ReadExpect, ReadStorage};
 
@@ -15,7 +16,7 @@ pub type SystemData<'a> = (
     ReadStorage<'a, Player>,
 );
 
-pub fn render(canvas: &mut WindowCanvas, data: SystemData) -> Result<(), String> {
+pub fn render(canvas: &mut WindowCanvas, data: SystemData, font: &Font) -> Result<(), String> {
     canvas.set_draw_color(Color::RGB(173, 216, 230));
     canvas.clear();
 
@@ -43,19 +44,20 @@ pub fn render(canvas: &mut WindowCanvas, data: SystemData) -> Result<(), String>
         canvas.fill_rect(rect)?;
 
         // Render player name next to the circle
-        let font_surface = font
+        let texture_creator = canvas.texture_creator();
+
+        let surface = font
             .render(&player.name)
-            .blended(Color::WHITE)
+            .blended(Color::RGBA(255, 0, 0, 255))
             .map_err(|e| e.to_string())?;
-        let font_texture = canvas
-            .texture_creator()
-            .create_texture_from_surface(&font_surface)
+        let texture = texture_creator
+            .create_texture_from_surface(&surface)
             .map_err(|e| e.to_string())?;
-        let font_rect = font_texture.query();
+        let font_rect = texture.query();
         let name_pos = Point::new(110, y + 10);
 
         canvas.copy(
-            &font_texture,
+            &texture,
             None,
             Rect::new(name_pos.x, name_pos.y, font_rect.width, font_rect.height),
         )?;

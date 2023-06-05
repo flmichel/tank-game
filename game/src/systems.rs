@@ -1,4 +1,4 @@
-use specs::{Entities, Join, ReadExpect, ReadStorage, System, WriteExpect, WriteStorage};
+use specs::{Entities, Join, ReadExpect, ReadStorage, System, WriteStorage};
 
 use crate::{
     components::{Player, ReadyStatus},
@@ -34,7 +34,6 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
                             Player::new(input.player_id, name.to_string()),
                         )
                         .unwrap();
-                    print!("new player created")
                 } else {
                     println!("No player found");
                     // TODO Log this case correctly
@@ -88,7 +87,9 @@ impl HandleInputs {
                     player.status = ReadyStatus::Ready;
                 }
                 RemoteInput::ConfigurationInput(ConfigurationInput::SetName(name)) => {
-                    player.name = name.to_string();
+                    if !name.is_empty() {
+                        player.name = name.to_string();
+                    }
                 }
                 RemoteInput::NoInput => {
                     print!("nothing to do")
