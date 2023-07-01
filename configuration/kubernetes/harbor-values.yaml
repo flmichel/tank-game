@@ -1,0 +1,14 @@
+expose:
+  type: loadBalancer
+  tls:
+    auto:
+      commonName: harbor.flmichel.duckdns.org
+  externalURL: https://harbor.flmichel.duckdns.org
+core:
+  server: harbor.flmichel.duckdns.org
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  data:
+    storageClass: "harbor"
+    size: "50Gi"

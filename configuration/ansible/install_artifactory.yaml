@@ -1,0 +1,42 @@
+---
+- name: Install Jenkins
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Add Jenkins Helm chart repository
+      command: helm repo add jfrog https://charts.jfrog.io
+
+    - name: Update Helm repositories
+      command: helm repo update
+
+    - name: Print $HOME
+      debug:
+        var: ansible_env.HOME
+
+    - name: Copy local storage file
+      copy:
+        src: ../kubernetes/artifactory-local-storage.yaml
+        dest: $HOME/artifactory-local-storage.yaml
+
+    - name: Copy local pv file
+      copy:
+        src: ../kubernetes/artifactory-local-pv.yaml
+        dest: $HOME/artifactory-local-pv.yaml
+
+    - name: Copy values file
+      copy:
+        src: ../kubernetes/artifactory-values.yaml
+        dest: $HOME/artifactory-values.yaml
+
+    - name: Apply local storage
+      command: kubectl apply -f artifactory-local-storage.yaml
+
+    - name: Apply local pv
+      command: kubectl apply -f artifactory-local-storage-pv.yaml
+
+    - name: Apply local storage
+      command: helm install artifactory jfrog/artifactory -f artifactory-values.yaml
+
+    - name: Wait for installation to complete
+      command: helm status jenkins-tank-game
+cmVmdGtuOjAxOjE3MTk3NzY5NjQ6eXNEUGRnc09kcGNwcVVhdWxYRkczNmFCY1Nn

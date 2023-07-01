@@ -1,0 +1,26 @@
+---
+- name: Install Harbor
+  hosts: all
+  become: true
+  tasks:
+    - name: Add Harbor Helm chart repository
+      command: helm repo add harbor https://helm.goharbor.io
+
+    - name: Update Helm repositories
+      command: helm repo update
+
+    - name: Create storage.yaml file
+      copy:
+        src: ../kubernetes/harbor-storage.yaml
+        dest: $HOME/harbor-storage.yaml
+
+    - name: Create values.yaml file
+      copy:
+        src: ../kubernetes/harbor-values.yaml
+        dest: $HOME/harbor-values.yaml
+
+    - name: Add Storage
+      command: kubectl apply -f $HOME/harbor-storage.yaml
+
+    - name: Install Harbor
+      command: helm install harbor harbor/harbor -f $HOME/harbor-values.yaml -n harbor

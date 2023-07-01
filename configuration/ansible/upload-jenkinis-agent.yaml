@@ -1,0 +1,22 @@
+---
+- hosts: localhost
+  gather_facts: false
+  become: true
+  vars:
+    docker_image_name: tank-game-agent
+    docker_image_tag: latest
+    harbor_registry: harbor.flmichel.duckdns.org
+    harbor_repository: tank-game
+
+  tasks:
+    #- name: Build Docker image with custom Dockerfile
+    #  command: docker build -t {{ docker_image_name }} -f ../jenkins/Dockerfile.agent .
+
+    - name: Login to harbor
+      command: docker login -u {{ harbor_username }} -p {{ harbor_password }} {{ harbor_registry }}
+
+    - name: Tag Docker image
+      command: docker tag {{ docker_image_name }}:{{ docker_image_tag }} {{ harbor_registry }}/{{ harbor_repository }}/{{ docker_image_name }}:{{ docker_image_tag }}
+
+    - name: Push Docker image to harbor
+      command: docker push {{ harbor_registry }}/{{ harbor_repository }}/{{ docker_image_name }}:{{ docker_image_tag }}

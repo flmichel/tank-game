@@ -1,0 +1,19 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: harbor
+provisioner: kubernetes.io/no-provisioner
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: harbor
+spec:
+  capacity:
+    storage: 50Gi
+  storageClassName: harbor
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/ssd/harbor

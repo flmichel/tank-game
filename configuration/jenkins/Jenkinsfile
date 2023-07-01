@@ -1,5 +1,11 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'harbor.flmichel.duckdns.org/tank-game/tank-game-agent:latest'
+            credentialsId 'bbcb1dbb-962d-448b-92a2-27bccdab4064'
+        }
+    }
+
 
     stages {
         stage('Server') {
