@@ -1,7 +1,7 @@
 use futures_channel::mpsc::unbounded;
 use game::components::{Circle, Movement, Player, Position};
 use game::game::{MessageToGame, RoomId};
-use game::game_state::{Phase, State};
+use game::game_state::{Assets, Phase, State};
 use game::remotes::{GameInput, PlayerInput, RemoteInput};
 use game::renderer::SystemData;
 use game::systems::{HandleInputs, RetrievePlayerForInputs};
@@ -11,15 +11,18 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::{Point, Rect};
-use sdl2::render::{Texture, WindowCanvas};
+use sdl2::render::{Canvas, Texture, TextureCreator, WindowCanvas};
 // "self" imports the "image" module itself as well as everything else we listed
 use anyhow::Result;
 use image::LoadTexture;
 use room_code::RoomCode;
 use sdl2::image::{self, InitFlag};
 use sdl2::ttf::{Font, Sdl2TtfContext};
+use sdl2::video::{Window, WindowContext};
 use server_communicator::ServerCommunicator;
 use specs::{Builder, Dispatcher, DispatcherBuilder, World, WorldExt};
+use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::spawn;
 
@@ -90,34 +93,12 @@ async fn main() -> Result<(), String> {
     );
     spawn(async move { server_communicator.start(receiver_server).await });
 
-    let sdl_context = sdl2::init().expect("failed to create context");
-    let video_subsystem = sdl_context.video()?;
-    // Leading "_" tells Rust that this is an unused variable that we don't care about. It has to
-    // stay unused because if we don't have any variable at all then Rust will treat it as a
-    // temporary value and drop it right away!
-    let _image_context = image::init(InitFlag::PNG | InitFlag::JPG).expect("failed to get image");
-
-    let window = video_subsystem
-        .window("tank game", 800, 600)
-        .fullscreen_desktop() // Set fullscreen mode
-        .position_centered()
-        .build()
-        .expect("could not initialize video subsystem");
-
-    let mut canvas = window
-        .into_canvas()
-        .build()
-        .expect("could not make a canvas");
-
-    let texture_creator = canvas.texture_creator();
-    let texture = texture_creator
-        .load_texture("assets/bardo.png")
-        .expect("failed to load texture");
+    let mut assets = load_assets();
 
     let mut world = create_world();
     let mut dispatcher = create_dispatcher();
 
-    let mut event_pump = sdl_context.event_pump()?;
+    let mut event_pump = assets.sdl_context.event_pump()?;
 
     let ttf_context = sdl2::ttf::init().unwrap();
     let font = load_font(&ttf_context);
@@ -153,7 +134,7 @@ async fn main() -> Result<(), String> {
         dispatcher.dispatch(&mut world);
 
         // Render
-        renderer::render(&mut canvas, world.system_data(), &font)?;
+        renderer::render(&mut assets, SystemData::new(world.system_data()), &font)?;
 
         // Time management!
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
@@ -194,4 +175,40 @@ fn load_font(ttf_context: &Sdl2TtfContext) -> Font {
     let font_path = "assets/NotoSans-Medium.ttf";
     let font_size = 24;
     ttf_context.load_font(font_path, font_size).unwrap()
+}
+
+fn load_assets<'a>() -> Assets<'a> {
+    let sdl_context = sdl2::init().expect("failed to create context");
+    let video_subsystem = sdl_context
+        .video()
+        .expect("failed to create video subsystem");
+
+    // Leading "_" tells Rust that this is an unused variable that we don't care about. It has to
+    // stay unused because if we don't have any variable at all then Rust will treat it as a
+    // temporary value and drop it right away!
+    let _image_context = image::init(InitFlag::PNG | InitFlag::JPG).expect("failed to get image");
+
+    let window = video_subsystem
+        .window("tank game", 800, 600)
+        .fullscreen_desktop() // Set fullscreen mode
+        .position_centered()
+        .build()
+        .expect("could not initialize video subsystem");
+
+    let canvas: Canvas<Window> = window
+        .into_canvas()
+        .build()
+        .expect("could not make a canvas");
+
+    let texture_creator: TextureCreator<WindowContext> = canvas.texture_creator();
+
+    let player_face = texture_creator
+        .load_texture("assets/grin.png")
+        .expect("Failed to load player face");
+
+    Assets {
+        canvas,
+        sdl_context,
+        player_face,
+    }
 }

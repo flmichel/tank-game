@@ -1,0 +1,10 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Create Kubernetes namespace
+      k8s:
+        api_version: v1
+        kind: Namespace
+        name: tank-game
+        state: present

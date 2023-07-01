@@ -79,7 +79,7 @@ impl HandleInputs {
     fn handle_configuration_inputs<'a>(&self, mut players: WriteStorage<'a, Player>) {
         for mut player in (&mut players).join() {
             match &player.next_input {
-                RemoteInput::GameInput(_) => print!("not allowded"),
+                RemoteInput::GameInput(_) => println!("not allowded: Game hasn't started yet"),
                 RemoteInput::ConfigurationInput(ConfigurationInput::NotReady) => {
                     player.status = ReadyStatus::NotReady;
                 }

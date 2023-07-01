@@ -1,0 +1,23 @@
+---
+name: Deploy Harbor using Helm
+kubernetes.core.helm_plugin:
+  name: harbor
+  chart_repo: https://helm.goharbor.io
+  chart_name: harbor
+  namespace: tank-game
+  values:
+    expose:
+      ingress:
+        enabled: true
+        hosts:
+          - harbor.tank-game.flmichel.duckdns.org
+        annotations:
+          kubernetes.io/ingress.class: nginx
+        tls:
+          enabled: true
+          secretName: harbor-tls-secret
+          hosts:
+            - harbor.tank-game.flmichel.duckdns.org
+    externalURL: https://harbor.tank-game.flmichel.duckdns.org
+    persistence:
+      existingClaim: harbor-pv

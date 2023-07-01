@@ -1,0 +1,2 @@
+[home]
+fserver ansible_host=192.168.1.29 ansible_user=francois ansible_connection=ssh ansible_ssh_private_key_file=/home/francois/.ssh/id_rsa

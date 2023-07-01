@@ -1,3 +1,5 @@
+use std::mem;
+
 use sdl2::{
     pixels::Color,
     rect::{Point, Rect},
@@ -6,21 +8,42 @@ use sdl2::{
 };
 use specs::{Join, ReadExpect, ReadStorage};
 
-use crate::{components::*, game_state::State};
+use crate::{
+    components::*,
+    game_state::{Assets, State},
+};
 
-// Type alias for the data needed by the renderer
-pub type SystemData<'a> = (
+type SystemDataType<'a> = (
     ReadExpect<'a, State>,
     ReadStorage<'a, Position>,
     ReadStorage<'a, Circle>,
     ReadStorage<'a, Player>,
 );
 
-pub fn render(canvas: &mut WindowCanvas, data: SystemData, font: &Font) -> Result<(), String> {
+pub struct SystemData<'a> {
+    system_data: SystemDataType<'a>,
+}
+
+impl<'a> SystemData<'a> {
+    pub fn new(system_data: SystemDataType<'a>) -> Self {
+        SystemData { system_data }
+    }
+    fn get_state(&mut self) -> &ReadExpect<'a, State> {
+        &self.system_data.0
+    }
+
+    fn get_players(&mut self) -> &ReadStorage<'a, Player> {
+        &self.system_data.3
+    }
+}
+
+pub fn render(assets: &mut Assets, mut data: SystemData, font: &Font) -> Result<(), String> {
+    let canvas = &mut assets.canvas;
+
     canvas.set_draw_color(Color::RGB(173, 216, 230));
     canvas.clear();
 
-    let squares = data.0.room_code.get_qr_code_squares(10);
+    let squares = data.get_state().room_code.get_qr_code_squares(10);
     squares.iter().for_each(|(square, color)| {
         canvas.set_draw_color(*color);
         let mut square = square.clone();
@@ -28,16 +51,16 @@ pub fn render(canvas: &mut WindowCanvas, data: SystemData, font: &Font) -> Resul
         canvas.fill_rect(square).unwrap();
     });
 
-    let mut y = 300; // Calculate starting Y position
+    let mut y = 200; // Calculate starting Y position
 
-    for player in data.3.join() {
+    for player in data.get_players().join() {
         let circle_color = match player.status {
             ReadyStatus::Ready => Color::GREEN,
             ReadyStatus::NotReady => Color::RED,
         };
 
         // Calculate the rectangle position and size
-        let rect = Rect::new(75 - 20, y, 40, 40);
+        let rect = Rect::new(500, y, 40, 40);
 
         // Draw the filled rectangle
         canvas.set_draw_color(circle_color);
@@ -54,7 +77,7 @@ pub fn render(canvas: &mut WindowCanvas, data: SystemData, font: &Font) -> Resul
             .create_texture_from_surface(&surface)
             .map_err(|e| e.to_string())?;
         let font_rect = texture.query();
-        let name_pos = Point::new(110, y + 10);
+        let name_pos = Point::new(560, y + 10);
 
         canvas.copy(
             &texture,

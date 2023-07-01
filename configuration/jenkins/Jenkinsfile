@@ -1,0 +1,38 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Server') {
+            steps {
+                dir('../../server') {
+                    sh 'cargo build'
+                }
+            }
+        }
+        
+        stage('Game') {
+            steps {
+                dir('../../game') {
+                    sh 'cargo build'
+                }
+            }
+        }
+        
+        stage('Remote') {
+            steps {
+                dir('../../remote') {
+                    sh 'npm install'
+                    sh 'npm run build'
+                }
+            }
+        }
+        
+        // Add more stages as needed
+        
+        stage('Deployment') {
+            steps {
+                // Perform deployment tasks
+            }
+        }
+    }
+}

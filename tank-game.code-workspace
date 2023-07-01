@@ -17,13 +17,15 @@
     },
     {
       "path": "documentation"
+    },
+    {
+      "path": "configuration"
     }
   ],
   "settings": {
     "liveServer.settings.multiRootWorkspaceName": "lit-remote",
     "html.format.wrapLineLength": 150,
-    "rust-analyzer.linkedProjects": [
-      "./Cargo.toml"
-    ]
-  },
+    "rust-analyzer.linkedProjects": ["./Cargo.toml"],
+    "ansible.python.interpreterPath": "/bin/python"
+  }
 }
