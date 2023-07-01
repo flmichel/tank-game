@@ -26,13 +26,5 @@ pipeline {
                 }
             }
         }
-        
-        // Add more stages as needed
-        
-        stage('Deployment') {
-            steps {
-                // Perform deployment tasks
-            }
-        }
     }
 }
