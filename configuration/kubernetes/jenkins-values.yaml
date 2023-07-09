@@ -1,0 +1,3 @@
+kubernetesEnabled: true
+kubernetesAgentImage: harbor.flmichel.duckdns.org/tank-game/tank-game-agent:latest
+kubernetesAgentImagePullSecretName: harbor-secret

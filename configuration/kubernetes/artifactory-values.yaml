@@ -1,5 +1,0 @@
-persistence:
-  enabled: true
-  storageClass: local-storage-class
-  accessMode: ReadWriteOnce
-  size: 30Gi

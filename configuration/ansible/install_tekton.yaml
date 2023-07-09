@@ -1,0 +1,24 @@
+---
+- name: Install Tekton
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Tekton pipelines
+      command: kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+
+    - name: Apply Tekton Triggers release.yaml
+      command: kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+
+    - name: Apply Tekton Triggers interceptors.yaml
+      command: kubectl apply --filename https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+
+    - name: Install Tekton dashboard
+      command: kubectl apply --filename https://storage.googleapis.com/tekton-releases/dashboard/latest/release.yaml
+
+    - name: Create values.yaml file
+      copy:
+        src: ../tekton/github/configure-webhook.yaml
+        dest: $HOME/configure-webhook.yaml
+
+    - name: Add Webhook configuration for Github
+      command: kubectl apply --filename $HOME/configure-webhook.yaml

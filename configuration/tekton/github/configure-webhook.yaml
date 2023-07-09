@@ -1,0 +1,46 @@
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: tank-game
+spec:
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: tank-game-pipeline-run-
+      spec:
+        pipelineRef:
+          name: pipeline
+        params:
+          - name: gitUrl
+            value: $(body.repository.html_url)
+          - name: gitRef
+            value: $(body.ref)
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: tank-game
+spec:
+  params:
+    - name: gitUrl
+      value: $(body.repository.html_url)
+    - name: gitRef
+      value: $(body.ref)
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: Trigger
+metadata:
+  name: tank-game
+spec:
+  resourceSpec:
+    type: git
+    params:
+      - name: url
+        value: https://github.com/flmichel/tank-game.git
+      - name: secretRef
+        value: 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
+  triggerTemplateRef:
+    name: tank-game
+  triggerBindingRef:
+    name: tank-game

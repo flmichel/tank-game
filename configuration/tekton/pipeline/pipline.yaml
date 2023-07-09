@@ -1,0 +1,8 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: my-pipeline
+spec:
+  workspaces:
+    - name: source-repo
+  tasks: ...

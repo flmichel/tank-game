@@ -1,6 +1,6 @@
 ---
 - name: Install Jenkins
-  hosts: localhost
+  hosts: all
   become: true
   tasks:
     - name: Add Jenkins Helm chart repository
@@ -11,16 +11,16 @@
 
     - name: Create values.yaml file
       copy:
-        src: ../kubernetes/jenkins-chart.yaml
-        dest: $HOME/jenkins-chart.yaml
+        src: ../kubernetes/jenkins-values.yaml
+        dest: $HOME/jenkins-values.yaml
 
     - name: Install Jenkins
-      command: helm install jenkins-tank-game jenkins/jenkins -f $HOME/jenkins-chart.yaml --kubeconfig $HOME/.kube/config --kube-apiserver https://192.168.1.29:16443
+      command: helm upgrade jenkins-tank-game jenkins/jenkins -f $HOME/jenkins-values.yaml -n tank-game
 
     - name: Wait for installation to complete
       command: helm status jenkins-tank-game
 
     - name: Remove values.yaml file
       file:
-        path: $HOME/jenkins-chart.yaml
+        path: $HOME/jenkins-values.yaml
         state: absent

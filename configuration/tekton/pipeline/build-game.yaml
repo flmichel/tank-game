@@ -1,0 +1,16 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-task
+spec:
+  workspaces:
+    - name: source-repo
+  steps:
+    - name: cargo-build
+      image: rust:latest
+      workingDir: "$(workspaces.source-repo.path)/src"
+      command:
+        - sh
+        - -c
+        - |
+          cargo build
