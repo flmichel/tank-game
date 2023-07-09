@@ -103,6 +103,12 @@ async fn main() -> Result<(), String> {
     let ttf_context = sdl2::ttf::init().unwrap();
     let font = load_font(&ttf_context);
 
+    let texture_creator: TextureCreator<WindowContext> = assets.canvas.texture_creator();
+
+    let player_face = texture_creator
+        .load_texture("assets/grin.png")
+        .expect("Failed to load player face");
+
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -134,7 +140,12 @@ async fn main() -> Result<(), String> {
         dispatcher.dispatch(&mut world);
 
         // Render
-        renderer::render(&mut assets, SystemData::new(world.system_data()), &font)?;
+        renderer::render(
+            &mut assets,
+            SystemData::new(world.system_data()),
+            &font,
+            &player_face,
+        )?;
 
         // Time management!
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
@@ -177,7 +188,7 @@ fn load_font(ttf_context: &Sdl2TtfContext) -> Font {
     ttf_context.load_font(font_path, font_size).unwrap()
 }
 
-fn load_assets<'a>() -> Assets<'a> {
+fn load_assets<'a>() -> Assets {
     let sdl_context = sdl2::init().expect("failed to create context");
     let video_subsystem = sdl_context
         .video()
@@ -200,15 +211,8 @@ fn load_assets<'a>() -> Assets<'a> {
         .build()
         .expect("could not make a canvas");
 
-    let texture_creator: TextureCreator<WindowContext> = canvas.texture_creator();
-
-    let player_face = texture_creator
-        .load_texture("assets/grin.png")
-        .expect("Failed to load player face");
-
     Assets {
         canvas,
         sdl_context,
-        player_face,
     }
 }

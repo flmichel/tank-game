@@ -37,7 +37,12 @@ impl<'a> SystemData<'a> {
     }
 }
 
-pub fn render(assets: &mut Assets, mut data: SystemData, font: &Font) -> Result<(), String> {
+pub fn render(
+    assets: &mut Assets,
+    mut data: SystemData,
+    font: &Font,
+    player_face: &Texture,
+) -> Result<(), String> {
     let canvas = &mut assets.canvas;
 
     canvas.set_draw_color(Color::RGB(173, 216, 230));
@@ -65,6 +70,10 @@ pub fn render(assets: &mut Assets, mut data: SystemData, font: &Font) -> Result<
         // Draw the filled rectangle
         canvas.set_draw_color(circle_color);
         canvas.fill_rect(rect)?;
+
+        // Render player face next to the circle
+        let face_dest_rect = Rect::new(460, y, 40, 40);
+        canvas.copy(player_face, None, face_dest_rect)?;
 
         // Render player name next to the circle
         let texture_creator = canvas.texture_creator();

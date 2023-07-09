@@ -1,8 +1,4 @@
-use sdl2::{
-    render::{Canvas, Texture, TextureCreator},
-    video::{Window, WindowContext},
-    Sdl,
-};
+use sdl2::{render::Canvas, video::Window, Sdl};
 
 use crate::room_code::RoomCode;
 
@@ -12,10 +8,9 @@ pub struct State {
     pub number_of_ready_players: u32,
 }
 
-pub struct Assets<'a> {
+pub struct Assets {
     pub canvas: Canvas<Window>,
     pub sdl_context: Sdl,
-    pub player_face: Texture<'a>,
 }
 
 pub enum Phase {
