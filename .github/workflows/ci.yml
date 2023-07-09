@@ -73,6 +73,9 @@ jobs:
       - name: Rust Cache Action
         uses: Swatinem/rust-cache@v2
 
+      - name: Install SDL2 dependencies
+        run: sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev
+
       - name: Run tests
         run: cargo test
 
