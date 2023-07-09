@@ -20,6 +20,9 @@
     },
     {
       "path": "configuration"
+    },
+    {
+      "path": ".github"
     }
   ],
   "settings": {

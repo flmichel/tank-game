@@ -19,9 +19,9 @@ DB_PASSWORD="${POSTGRES_PASSWORD:=password}"
 DB_NAME="${POSTGRES_DB:=tank-game}"
 DB_PORT="${POSTGRES_PORT:=5432}"
 
-sudo systemctl start docker
 if [[ -z "${SKIP_DOCKER}" ]]
 then
+  sudo systemctl start docker
   docker run \
       -e POSTGRES_USER=${DB_USER} \
       -e POSTGRES_PASSWORD=${DB_PASSWORD} \

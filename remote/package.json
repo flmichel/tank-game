@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently --kill-others \" npm run build \" \" npm run serve \" ",
+    "start": "concurrently --kill-others \" npm run build-watch \" \" npm run serve \" ",
     "serve": "webpack serve",
-    "build": "webpack --watch"
+    "build-watch": "webpack --watch",
+    "build": "webpack"
   },
   "author": "",
   "license": "ISC",
