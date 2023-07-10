@@ -1,4 +1,4 @@
-use specs::{Entities, Join, ReadExpect, ReadStorage, System, WriteStorage};
+use specs::{Entities, Join, ReadExpect, ReadStorage, System, Write, WriteExpect, WriteStorage};
 
 use crate::{
     components::{Player, ReadyStatus},
@@ -63,11 +63,13 @@ impl RetrievePlayerForInputs {
 pub struct HandleInputs;
 
 impl<'a> System<'a> for HandleInputs {
-    type SystemData = (WriteStorage<'a, Player>, ReadExpect<'a, State>);
+    type SystemData = (WriteStorage<'a, Player>, WriteExpect<'a, State>);
 
     fn run(&mut self, (players, state): Self::SystemData) {
         match state.phase {
-            Phase::BeforeNextGame | Phase::BreakInGame => self.handle_configuration_inputs(players),
+            Phase::BeforeNextGame | Phase::BreakInGame => {
+                self.handle_configuration_inputs(players, state)
+            }
             Phase::InGame => {
                 print!("not supported yet");
             }
@@ -76,7 +78,11 @@ impl<'a> System<'a> for HandleInputs {
 }
 
 impl HandleInputs {
-    fn handle_configuration_inputs<'a>(&self, mut players: WriteStorage<'a, Player>) {
+    fn handle_configuration_inputs<'a>(
+        &self,
+        mut players: WriteStorage<'a, Player>,
+        mut state: WriteExpect<'a, State>,
+    ) {
         for mut player in (&mut players).join() {
             match &player.next_input {
                 RemoteInput::GameInput(_) => {
@@ -98,5 +104,13 @@ impl HandleInputs {
                 }
             }
         }
+
+        if Self::all_players_are_ready(&players) {
+            state.phase = Phase::InGame;
+        }
+    }
+
+    fn all_players_are_ready(players: &WriteStorage<Player>) -> bool {
+        players.join().all(|player| player.is_ready())
     }
 }

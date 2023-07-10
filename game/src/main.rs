@@ -2,16 +2,14 @@ use futures_channel::mpsc::unbounded;
 use game::components::{Circle, Movement, Player, Position};
 use game::game::{MessageToGame, RoomId};
 use game::game_state::{Assets, Phase, State};
-use game::remotes::{GameInput, PlayerInput, RemoteInput};
+use game::remotes::PlayerInput;
 use game::renderer::SystemData;
 use game::systems::{HandleInputs, RetrievePlayerForInputs};
 use game::{players_connector, renderer, room_code, server_communicator};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
-use sdl2::rect::{Point, Rect};
-use sdl2::render::{Canvas, Texture, TextureCreator, WindowCanvas};
+use sdl2::render::{Canvas, TextureCreator};
 // "self" imports the "image" module itself as well as everything else we listed
 use anyhow::Result;
 use image::LoadTexture;
@@ -21,8 +19,6 @@ use sdl2::ttf::{Font, Sdl2TtfContext};
 use sdl2::video::{Window, WindowContext};
 use server_communicator::ServerCommunicator;
 use specs::{Builder, Dispatcher, DispatcherBuilder, World, WorldExt};
-use std::rc::Rc;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::spawn;
 
@@ -147,7 +143,7 @@ async fn main() -> Result<(), String> {
             &player_face,
         )?;
 
-        // Time management!
+        // Time management
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
     }
 

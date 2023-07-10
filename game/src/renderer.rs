@@ -1,9 +1,7 @@
-use std::mem;
-
 use sdl2::{
     pixels::Color,
     rect::{Point, Rect},
-    render::{Texture, WindowCanvas},
+    render::Texture,
     ttf::Font,
 };
 use specs::{Join, ReadExpect, ReadStorage};

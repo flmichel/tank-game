@@ -45,8 +45,13 @@ impl Player {
             next_input: RemoteInput::NoInput,
         }
     }
+
+    pub fn is_ready(&self) -> bool {
+        self.status == ReadyStatus::Ready
+    }
 }
 
+#[derive(PartialEq)]
 pub enum ReadyStatus {
     Ready,
     NotReady,
