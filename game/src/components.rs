@@ -4,18 +4,49 @@ use specs_derive::Component;
 
 use crate::remotes::RemoteInput;
 
+const PLAYER_MOVEMENT_SPEED: f64 = 5.;
+
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Position {
-    pub x: f32,
-    pub y: f32,
+    pub x: f64,
+    pub y: f64,
+}
+
+impl Position {
+    pub fn new() -> Position {
+        Position { x: 0., y: 0. }
+    }
+
+    pub fn update(&mut self, movement: &Movement) {
+        self.x += movement.speed * movement.direction.cos();
+        self.y += movement.speed * movement.direction.sin();
+    }
 }
 
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Movement {
-    direction: f32,
-    speed: f32,
+    direction: f64,
+    speed: f64,
+}
+
+impl Movement {
+    pub fn new() -> Movement {
+        Movement {
+            direction: 0.,
+            speed: 0.,
+        }
+    }
+
+    pub fn set_player_direction(&mut self, direction: f64) {
+        self.direction = direction;
+        self.speed = PLAYER_MOVEMENT_SPEED;
+    }
+
+    pub fn stop(&mut self) {
+        self.speed = 0.;
+    }
 }
 
 #[derive(Component)]

@@ -22,8 +22,6 @@ use specs::{Builder, Dispatcher, DispatcherBuilder, World, WorldExt};
 use std::time::Duration;
 use tokio::spawn;
 
-const PLAYER_MOVEMENT_SPEED: f64 = 5.0;
-
 #[derive(Debug, Clone, Copy)]
 struct Direction(f64);
 
