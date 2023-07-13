@@ -1,12 +1,13 @@
 pub mod components;
 pub mod controllers;
+pub mod error;
 pub mod game;
-pub mod game_state;
 pub mod players_connector;
 pub mod remote_communicator;
 pub mod remotes;
-pub mod renderer;
+pub mod render;
 pub mod room_code;
 pub mod server_communicator;
 pub mod signal;
+pub mod state;
 pub mod systems;

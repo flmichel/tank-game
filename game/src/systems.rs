@@ -2,8 +2,8 @@ use specs::{Entities, Join, ReadExpect, ReadStorage, System, Write, WriteExpect,
 
 use crate::{
     components::{Movement, Player, Position, ReadyStatus},
-    game_state::{Phase, State},
     remotes::{ConfigurationInput, GameInput, PlayerInput, RemoteInput},
+    state::game_state::{Phase, State},
 };
 
 pub struct RetrievePlayerForInputs;

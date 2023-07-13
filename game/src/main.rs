@@ -1,11 +1,12 @@
 use futures_channel::mpsc::unbounded;
 use game::components::{Circle, Movement, Player, Position};
 use game::game::{MessageToGame, RoomId};
-use game::game_state::{Assets, Phase, State};
 use game::remotes::PlayerInput;
-use game::renderer::SystemData;
+use game::render::renderer::SystemData;
+use game::state::game_state::{Assets, Phase, State};
+use game::state::Map;
 use game::systems::{HandleInputs, RetrievePlayerForInputs};
-use game::{players_connector, renderer, room_code, server_communicator};
+use game::{players_connector, render::renderer, room_code, server_communicator};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -24,48 +25,6 @@ use tokio::spawn;
 
 #[derive(Debug, Clone, Copy)]
 struct Direction(f64);
-
-/*fn render(
-    canvas: &mut WindowCanvas,
-    texture: &Texture,
-    player: &Player,
-    room_code: &RoomCode,
-) -> Result<(), String> {
-    canvas.set_draw_color(Color::RGB(173, 216, 230));
-    canvas.clear();
-
-    let squares = room_code.get_qr_code_squares(10);
-    squares.iter().for_each(|(square, color)| {
-        canvas.set_draw_color(*color);
-        let mut square = square.clone();
-        square.offset(10, 10);
-        canvas.fill_rect(square).unwrap();
-    });
-
-    let (width, height) = canvas.output_size()?;
-
-    // Treat the center of the screen as the (0, 0) coordinate
-    let screen_position = player.position + Point::new(width as i32 / 2, height as i32 / 2);
-    let screen_rect = Rect::from_center(
-        screen_position,
-        player.sprite.width(),
-        player.sprite.height(),
-    );
-
-    canvas.copy(texture, player.sprite, screen_rect)?;
-
-    canvas.present();
-
-    Ok(())
-}*/
-
-/*
-fn update_player(player: &mut Player) {
-    let x = (player.speed * player.direction.0.cos()) as i32;
-    let y = (player.speed * player.direction.0.sin()) as i32;
-    player.position = player.position.offset(x, y);
-}
-*/
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -86,6 +45,8 @@ async fn main() -> Result<(), String> {
         "ws://localhost:5000",
     );
     spawn(async move { server_communicator.start(receiver_server).await });
+
+    let map = Map::from_file("assets/map.txt").unwrap();
 
     let mut assets = load_assets();
 

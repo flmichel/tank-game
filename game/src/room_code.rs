@@ -27,13 +27,13 @@ impl RoomCode {
         let mut squares = Vec::new();
         for x in 0..self.qr_code.width() {
             for y in 0..self.qr_code.width() {
-                squares.push(self.build_sqare(square_size, x, y))
+                squares.push(self.build_square(square_size, x, y))
             }
         }
         squares
     }
 
-    fn build_sqare(&self, square_size: usize, x: usize, y: usize) -> (Rect, Color) {
+    fn build_square(&self, square_size: usize, x: usize, y: usize) -> (Rect, Color) {
         let rect = Rect::new(
             x as i32 * square_size as i32,
             y as i32 * square_size as i32,

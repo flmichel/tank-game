@@ -8,7 +8,7 @@ use specs::{Join, ReadExpect, ReadStorage};
 
 use crate::{
     components::*,
-    game_state::{Assets, Phase, State},
+    state::game_state::{Assets, Phase, State},
 };
 
 type SystemDataType<'a> = (
