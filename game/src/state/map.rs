@@ -12,8 +12,14 @@ const PLAYER_DIAMETER: f32 = 0.5;
 struct Block(i8, i8);
 
 pub struct Map {
-    blocks: HashSet<Block>,
-    spawns: HashSet<Block>,
+    wall_set: HashSet<Block>,
+    spawns: Vec<Block>,
+    pub block_matrix: Vec<Vec<BlockKind>>,
+}
+
+pub enum BlockKind {
+    Wall,
+    Ground,
 }
 
 impl Map {
@@ -23,8 +29,9 @@ impl Map {
         })?;
         let reader = BufReader::new(file);
 
-        let mut blocks = HashSet::new();
-        let mut spawns = HashSet::new();
+        let mut wall_set = HashSet::new();
+        let mut spawns = Vec::new();
+        let mut block_matrix = Vec::new();
         let mut y = 0;
 
         for line in reader.lines() {
@@ -32,22 +39,32 @@ impl Map {
                 Error::from(err, ConfigurationError).explain("could not parse line")
             })?;
             let chars: Vec<char> = row.chars().collect();
+            let mut block_row = Vec::new();
 
             for (x, ch) in chars.iter().enumerate() {
                 match ch {
                     'x' => {
-                        blocks.insert(Block(x as i8, y as i8));
+                        wall_set.insert(Block(x as i8, y as i8));
+                        block_row.push(BlockKind::Wall);
                     }
                     's' => {
-                        spawns.insert(Block(x as i8, y as i8));
+                        spawns.push(Block(x as i8, y as i8));
+                        block_row.push(BlockKind::Ground);
                     }
-                    _ => {}
+                    _ => {
+                        block_row.push(BlockKind::Ground);
+                    }
                 }
             }
 
+            block_matrix.push(block_row);
             y += 1;
         }
 
-        Ok(Map { blocks, spawns })
+        Ok(Map {
+            wall_set,
+            spawns,
+            block_matrix,
+        })
     }
 }

@@ -1,14 +1,18 @@
 use sdl2::{
     pixels::Color,
     rect::{Point, Rect},
-    render::Texture,
+    render::{Canvas, Texture},
     ttf::Font,
+    video::Window,
 };
 use specs::{Join, ReadExpect, ReadStorage};
 
 use crate::{
     components::*,
-    state::game_state::{Assets, Phase, State},
+    state::{
+        game_state::{Assets, Phase, State},
+        BlockKind, Map,
+    },
 };
 
 type SystemDataType<'a> = (
@@ -56,12 +60,7 @@ pub fn render(
     Ok(())
 }
 
-pub fn render_before_game(
-    assets: &mut Assets,
-    data: SystemData,
-    font: &Font,
-    player_face: &Texture,
-) {
+fn render_before_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: &Texture) {
     let canvas = &mut assets.canvas;
 
     canvas.set_draw_color(Color::RGB(173, 216, 230));
@@ -124,11 +123,13 @@ pub fn render_before_game(
     canvas.present();
 }
 
-pub fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: &Texture) {
+fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: &Texture) {
     let canvas = &mut assets.canvas;
 
     canvas.set_draw_color(Color::RGB(173, 216, 150));
     canvas.clear();
+
+    render_map(&data.get_state().map, canvas);
 
     for (player, position) in (data.get_players(), data.get_position()).join() {
         // Render player face next to the circle
@@ -164,4 +165,39 @@ pub fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_fa
     }
 
     canvas.present();
+}
+
+fn render_map(map: &Map, canvas: &mut Canvas<Window>) {
+    let (window_width, window_height) = canvas.window().size();
+
+    // Calculate the size of each block based on the window dimensions and the block matrix size
+    let block_width = window_width / 16 as u32;
+    let block_height = window_height / 9 as u32;
+
+    canvas.set_draw_color(Color::RGB(255, 255, 255));
+    canvas.clear();
+
+    for (row_index, row) in map.block_matrix.iter().enumerate() {
+        for (col_index, block_kind) in row.iter().enumerate() {
+            let block_x = col_index as i32 * block_width as i32;
+            let block_y = row_index as i32 * block_height as i32;
+
+            match block_kind {
+                BlockKind::Wall => {
+                    // Draw a wall block
+                    canvas.set_draw_color(Color::RGB(0, 0, 0));
+                    canvas
+                        .fill_rect(Rect::new(block_x, block_y, block_width, block_height))
+                        .unwrap();
+                }
+                BlockKind::Ground => {
+                    // Draw a ground block
+                    canvas.set_draw_color(Color::RGB(255, 255, 255));
+                    canvas
+                        .fill_rect(Rect::new(block_x, block_y, block_width, block_height))
+                        .unwrap();
+                }
+            }
+        }
+    }
 }

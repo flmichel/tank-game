@@ -46,8 +46,6 @@ async fn main() -> Result<(), String> {
     );
     spawn(async move { server_communicator.start(receiver_server).await });
 
-    let map = Map::from_file("assets/map.txt").unwrap();
-
     let mut assets = load_assets();
 
     let mut world = create_world();
@@ -83,7 +81,7 @@ async fn main() -> Result<(), String> {
                 MessageToGame::RoomId(id) => {
                     let mut game_state = world.write_resource::<State>();
                     game_state.room_code = RoomCode::new(
-                        format!("http://192.168.0.108:8080/?room-id={}", id.0).to_owned(),
+                        format!("http://192.168.0.107:8080/?room-id={}", id.0).to_owned(),
                     );
                 }
                 MessageToGame::PlayerInput(player_input) => {
@@ -122,6 +120,7 @@ fn create_world() -> World {
         room_code: RoomCode::new("Error, the game could not connect to server".to_owned()),
         phase: Phase::BeforeNextGame,
         number_of_ready_players: 0,
+        map: Map::from_file("assets/map.txt").unwrap(),
     };
     world.insert(game_state);
 
