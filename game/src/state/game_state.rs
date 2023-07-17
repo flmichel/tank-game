@@ -9,6 +9,7 @@ pub struct State {
     pub phase: Phase,
     pub number_of_ready_players: u32,
     pub map: Map,
+    pub resolution: (u32, u32),
 }
 
 pub struct Assets {

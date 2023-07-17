@@ -15,6 +15,8 @@ use crate::{
     },
 };
 
+pub const FRAME_PER_SECOND: u32 = 30;
+
 type SystemDataType<'a> = (
     ReadExpect<'a, State>,
     ReadStorage<'a, Position>,
@@ -36,6 +38,10 @@ impl<'a> SystemData<'a> {
 
     fn get_position(&self) -> &ReadStorage<'a, Position> {
         &self.system_data.1
+    }
+
+    fn get_circle(&self) -> &ReadStorage<'a, Circle> {
+        &self.system_data.2
     }
 
     fn get_players(&self) -> &ReadStorage<'a, Player> {
@@ -129,11 +135,20 @@ fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: 
     canvas.set_draw_color(Color::RGB(173, 216, 150));
     canvas.clear();
 
-    render_map(&data.get_state().map, canvas);
+    let map = &data.get_state().map;
 
-    for (player, position) in (data.get_players(), data.get_position()).join() {
+    render_map(map, canvas);
+
+    for (player, position, circle) in
+        (data.get_players(), data.get_position(), data.get_circle()).join()
+    {
         // Render player face next to the circle
-        let face_dest_rect = Rect::new(position.x as i32, position.y as i32, 50, 50);
+        let face_dest_rect = Rect::new(
+            ((position.x - circle.get_radius()) * map.block_size() as f64) as i32,
+            ((position.y - circle.get_radius()) * map.block_size() as f64) as i32,
+            (circle.get_size() * map.block_size() as f64) as u32,
+            (circle.get_size() * map.block_size() as f64) as u32,
+        );
         canvas.copy(player_face, None, face_dest_rect).unwrap();
 
         // Render player name next to the circle
@@ -155,8 +170,8 @@ fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: 
                 &texture,
                 None,
                 Rect::new(
-                    position.x as i32,
-                    position.y as i32,
+                    (position.x * map.block_size() as f64) as i32,
+                    (position.y * map.block_size() as f64) as i32,
                     font_rect.width,
                     font_rect.height,
                 ),
@@ -168,33 +183,28 @@ fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: 
 }
 
 fn render_map(map: &Map, canvas: &mut Canvas<Window>) {
-    let (window_width, window_height) = canvas.window().size();
-
-    // Calculate the size of each block based on the window dimensions and the block matrix size
-    let block_width = window_width / 16 as u32;
-    let block_height = window_height / 9 as u32;
-
+    let block_size = map.block_size();
     canvas.set_draw_color(Color::RGB(255, 255, 255));
     canvas.clear();
 
     for (row_index, row) in map.block_matrix.iter().enumerate() {
         for (col_index, block_kind) in row.iter().enumerate() {
-            let block_x = col_index as i32 * block_width as i32;
-            let block_y = row_index as i32 * block_height as i32;
+            let block_x = col_index as i32 * block_size as i32;
+            let block_y = row_index as i32 * block_size as i32;
 
             match block_kind {
                 BlockKind::Wall => {
                     // Draw a wall block
                     canvas.set_draw_color(Color::RGB(0, 0, 0));
                     canvas
-                        .fill_rect(Rect::new(block_x, block_y, block_width, block_height))
+                        .fill_rect(Rect::new(block_x, block_y, block_size, block_size))
                         .unwrap();
                 }
                 BlockKind::Ground => {
                     // Draw a ground block
                     canvas.set_draw_color(Color::RGB(255, 255, 255));
                     canvas
-                        .fill_rect(Rect::new(block_x, block_y, block_width, block_height))
+                        .fill_rect(Rect::new(block_x, block_y, block_size, block_size))
                         .unwrap();
                 }
             }

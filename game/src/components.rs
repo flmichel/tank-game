@@ -1,10 +1,10 @@
-use sdl2::pixels::Color;
 use specs::{Component, VecStorage};
 use specs_derive::Component;
 
-use crate::remotes::RemoteInput;
+use crate::{remotes::RemoteInput, render::renderer};
 
-const PLAYER_MOVEMENT_SPEED: f64 = 5.;
+const BLOCK_PER_SECOND: f64 = 0.5;
+const DEFAULT_PLAYER_RADIUS: f64 = 0.1;
 
 #[derive(Component)]
 #[storage(VecStorage)]
@@ -18,9 +18,15 @@ impl Position {
         Position { x: 0., y: 0. }
     }
 
-    pub fn update(&mut self, movement: &Movement) {
-        self.x += movement.speed * movement.direction.cos();
-        self.y += movement.speed * movement.direction.sin();
+    pub fn next(&mut self, movement: &Movement) -> Position {
+        let x = self.x + movement.speed * movement.direction.cos();
+        let y = self.y + movement.speed * movement.direction.sin();
+        Position { x, y }
+    }
+
+    pub fn update(&mut self, new_position: &Position) {
+        self.x = new_position.x;
+        self.y = new_position.y;
     }
 }
 
@@ -41,7 +47,7 @@ impl Movement {
 
     pub fn set_player_direction(&mut self, direction: f64) {
         self.direction = direction;
-        self.speed = PLAYER_MOVEMENT_SPEED;
+        self.speed = BLOCK_PER_SECOND / renderer::FRAME_PER_SECOND as f64;
     }
 
     pub fn stop(&mut self) {
@@ -52,8 +58,23 @@ impl Movement {
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Circle {
-    radius: i32,
-    color: Color,
+    radius: f64,
+}
+
+impl Circle {
+    pub fn new_player_circle() -> Circle {
+        Circle {
+            radius: DEFAULT_PLAYER_RADIUS,
+        }
+    }
+
+    pub fn get_size(&self) -> f64 {
+        self.radius * 2.
+    }
+
+    pub fn get_radius(&self) -> f64 {
+        self.radius
+    }
 }
 
 #[derive(Component)]

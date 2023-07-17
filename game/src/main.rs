@@ -48,7 +48,7 @@ async fn main() -> Result<(), String> {
 
     let mut assets = load_assets();
 
-    let mut world = create_world();
+    let mut world = create_world(assets.canvas.window());
     let mut dispatcher = create_dispatcher();
 
     let mut event_pump = assets.sdl_context.event_pump()?;
@@ -101,13 +101,16 @@ async fn main() -> Result<(), String> {
         )?;
 
         // Time management
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
+        std::thread::sleep(Duration::new(
+            0,
+            1_000_000_000u32 / renderer::FRAME_PER_SECOND,
+        ));
     }
 
     Ok(())
 }
 
-fn create_world() -> World {
+fn create_world(window: &Window) -> World {
     let mut world = World::new();
     world.register::<RoomId>();
     world.register::<PlayerInput>();
@@ -120,7 +123,8 @@ fn create_world() -> World {
         room_code: RoomCode::new("Error, the game could not connect to server".to_owned()),
         phase: Phase::BeforeNextGame,
         number_of_ready_players: 0,
-        map: Map::from_file("assets/map.txt").unwrap(),
+        map: Map::from_file("assets/map.txt", window.size()).unwrap(),
+        resolution: window.size(),
     };
     world.insert(game_state);
 

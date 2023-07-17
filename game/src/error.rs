@@ -7,10 +7,13 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn new(kind: ErrorKind, description: String) -> Error {
+    pub fn new<D>(kind: ErrorKind, description: D) -> Error
+    where
+        D: Into<String>,
+    {
         Error {
             kind,
-            description: vec![description],
+            description: vec![description.into()],
         }
     }
 
@@ -36,4 +39,5 @@ impl fmt::Display for Error {
 #[derive(Debug)]
 pub enum ErrorKind {
     ConfigurationError,
+    NoSpawnAvailable,
 }

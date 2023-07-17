@@ -1,9 +1,12 @@
-use specs::{Entities, Join, ReadExpect, ReadStorage, System, Write, WriteExpect, WriteStorage};
+use specs::{Entities, Join, ReadStorage, System, WriteExpect, WriteStorage};
 
 use crate::{
-    components::{Movement, Player, Position, ReadyStatus},
+    components::{Circle, Movement, Player, Position, ReadyStatus},
     remotes::{ConfigurationInput, GameInput, PlayerInput, RemoteInput},
-    state::game_state::{Phase, State},
+    state::{
+        game_state::{Phase, State},
+        Block, Map,
+    },
 };
 
 pub struct RetrievePlayerForInputs;
@@ -40,10 +43,6 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
                             Player::new(input.player_id, name.to_string()),
                         )
                         .unwrap();
-
-                    positions.insert(player_entity, Position::new()).unwrap();
-
-                    movements.insert(player_entity, Movement::new()).unwrap();
                 } else {
                     println!("No player found");
                     // TODO Log this case correctly
@@ -74,20 +73,22 @@ pub struct HandleInputs;
 
 impl<'a> System<'a> for HandleInputs {
     type SystemData = (
+        Entities<'a>,
         WriteStorage<'a, Player>,
         WriteStorage<'a, Movement>,
         WriteStorage<'a, Position>,
+        WriteStorage<'a, Circle>,
         WriteExpect<'a, State>,
     );
 
-    fn run(&mut self, (players, movements, positions, state): Self::SystemData) {
+    fn run(&mut self, (entities, players, movements, positions, circles, state): Self::SystemData) {
         match state.phase {
-            Phase::BeforeNextGame | Phase::BreakInGame => {
-                self.handle_configuration_inputs(players, state)
-            }
+            Phase::BeforeNextGame | Phase::BreakInGame => self.handle_configuration_inputs(
+                entities, players, movements, positions, circles, state,
+            ),
             Phase::InGame => {
                 let (players, movements) = self.handle_game_inputs(players, movements);
-                self.update_game(players, movements, positions, state);
+                self.update_game(circles, movements, positions, state);
             }
         }
     }
@@ -96,7 +97,11 @@ impl<'a> System<'a> for HandleInputs {
 impl HandleInputs {
     fn handle_configuration_inputs<'a>(
         &self,
+        entities: Entities<'a>,
         mut players: WriteStorage<'a, Player>,
+        mut movements: WriteStorage<'a, Movement>,
+        mut positions: WriteStorage<'a, Position>,
+        mut circles: WriteStorage<'a, Circle>,
         mut state: WriteExpect<'a, State>,
     ) {
         for mut player in (&mut players).join() {
@@ -123,6 +128,22 @@ impl HandleInputs {
 
         if self.all_players_are_ready(&players) {
             state.phase = Phase::InGame;
+
+            for (player_entity, _) in (&entities, &players).join() {
+                let spawn = state.map.get_spawn_block();
+                match spawn {
+                    Err(err) => print!("Couldn't spawn player: {}", err),
+                    Ok(spawn) => {
+                        let spawn_position = get_position_block_center(spawn);
+
+                        positions.insert(player_entity, spawn_position).unwrap();
+                        movements.insert(player_entity, Movement::new()).unwrap();
+                        circles
+                            .insert(player_entity, Circle::new_player_circle())
+                            .unwrap();
+                    }
+                }
+            }
         }
     }
 
@@ -154,13 +175,35 @@ impl HandleInputs {
 
     fn update_game<'a>(
         &self,
-        mut players: WriteStorage<'a, Player>,
+        mut circles: WriteStorage<'a, Circle>,
         mut movements: WriteStorage<'a, Movement>,
         mut positions: WriteStorage<'a, Position>,
         mut state: WriteExpect<'a, State>,
     ) {
-        for (movement, position) in (&mut movements, &mut positions).join() {
-            position.update(movement);
+        for (circle, movement, position) in (&mut circles, &mut movements, &mut positions).join() {
+            let next_position = position.next(movement);
+            if !has_wall_collision(&next_position, circle, &state.map) {
+                position.update(&next_position);
+            }
         }
     }
+}
+
+fn get_position_block_center(block: Block) -> Position {
+    Position {
+        x: 0.5 + block.0 as f64,
+        y: 0.5 + block.1 as f64,
+    }
+}
+
+fn has_wall_collision(position: &Position, circle: &Circle, map: &Map) -> bool {
+    let top_block = &Block(position.x as u8, (position.y - circle.get_radius()) as u8);
+    let bottom_block = &Block(position.x as u8, (position.y + circle.get_radius()) as u8);
+    let right_block = &Block((position.x + circle.get_radius()) as u8, position.y as u8);
+    let left_block = &Block((position.x - circle.get_radius()) as u8, position.y as u8);
+
+    map.is_wall(left_block)
+        || map.is_wall(right_block)
+        || map.is_wall(top_block)
+        || map.is_wall(bottom_block)
 }

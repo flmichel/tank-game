@@ -1066,6 +1066,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "qrcode",
+ "rand",
  "sdl2",
  "serde",
  "serde_json",
@@ -1514,12 +1515,6 @@ dependencies = [
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.45.0",
 ]
-
-[[package]]
-name = "mopa"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a785740271256c230f57462d3b83e52f998433a7062fc18f96d5999474a9f915"
 
 [[package]]
 name = "nix"
@@ -2385,13 +2380,12 @@ dependencies = [
 
 [[package]]
 name = "shred"
-version = "0.13.0"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "102269e720bb814df57e136161cad841f2b6f411e003ac748fc48aaf2363bea3"
+checksum = "d6aa4148ce950f367ede79bff6bb04bbf3c31317a1291315078ef60c080821a1"
 dependencies = [
+ "ahash",
  "arrayvec",
- "hashbrown",
- "mopa",
  "rayon",
  "smallvec",
  "tynm",
@@ -2449,12 +2443,12 @@ dependencies = [
 
 [[package]]
 name = "specs"
-version = "0.18.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ea85dac2880f84d4025ff5ace80cda6d8bc43bc88b6a389b9277fcf894b51e9"
+checksum = "ad2e89cb8aba27bebf48a5a47b4889e7b317a08884d92cc36109d58992d41325"
 dependencies = [
+ "ahash",
  "crossbeam-queue",
- "hashbrown",
  "hibitset",
  "log",
  "rayon",
