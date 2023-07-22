@@ -1,0 +1,31 @@
+name: Prod
+
+on:
+  push:
+    branches: ["master"]
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_VERSION: 0.6.2
+  SQLX_FEATURES: "rustls,postgres"
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker CLI
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+          registry: harbor.flmichel.duckdns.org/tank-game
+
+      - name: Build and Push Docker Image
+        run: |
+          # Your Docker build and push commands go here
+          docker build -t harbor.flmichel.duckdns.org/tank-game/server:latest .
+          docker push harbor.flmichel.duckdns.org/tank-game/server:latest
