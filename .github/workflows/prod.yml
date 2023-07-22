@@ -4,14 +4,13 @@ on:
   push:
     branches: ["master"]
 
-env:
-  CARGO_TERM_COLOR: always
-  SQLX_VERSION: 0.6.2
-  SQLX_FEATURES: "rustls,postgres"
-
 jobs:
   server:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./server
 
     steps:
       - name: Check out repository code
