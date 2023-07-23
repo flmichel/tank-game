@@ -7,12 +7,13 @@
     "start": "concurrently --kill-others \" npm run build-watch \" \" npm run serve \" ",
     "serve": "webpack serve",
     "build-watch": "webpack --watch",
-    "build": "webpack"
+    "build": "webpack --config webpack.config.js --mode production"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "concurrently": "^8.0.1",
+    "dotenv-webpack": "^8.0.1",
     "ts-loader": "^9.4.2",
     "typescript": "^5.0.4",
     "webpack": "^5.82.0",

@@ -37,3 +37,27 @@ jobs:
 
       #- name: Apply Kubernetes Manifests
       #  run: kubectl apply -f manifests/
+
+  remote:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./remote
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker CLI
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+          registry: harbor.flmichel.duckdns.org/tank-game
+
+      - name: Build and Push Docker Image
+        run: |
+          # Your Docker build and push commands go here
+          docker build -t harbor.flmichel.duckdns.org/tank-game/remote:latest .
+          docker push harbor.flmichel.duckdns.org/tank-game/remote:latest

@@ -6,4 +6,7 @@ export default {
       },
     ],
   }),
-}
+};
+
+export const apiBaseUrl = process.env.API_BASE_URL;
+export const cors = process.env.CORS === "true" ? "cors" : "no-cors";

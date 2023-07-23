@@ -80,9 +80,8 @@ async fn main() -> Result<(), String> {
             match message {
                 MessageToGame::RoomId(id) => {
                     let mut game_state = world.write_resource::<State>();
-                    game_state.room_code = RoomCode::new(
-                        format!("http://192.168.0.107:8080/?room-id={}", id.0).to_owned(),
-                    );
+                    game_state.room_code =
+                        RoomCode::new(format!("http://localhost:80/?room-id={}", id.0).to_owned());
                 }
                 MessageToGame::PlayerInput(player_input) => {
                     world.create_entity().with(player_input).build();
