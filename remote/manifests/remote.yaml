@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remote
+  namespace: tank-game
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: remote
+  template:
+    metadata:
+      labels:
+        app: remote
+    spec:
+      containers:
+        - name: remote
+          image: harbor.flmichel.duckdns.org/tank-game/remote:latest
+          ports:
+            - containerPort: 80
+      imagePullSecrets:
+        - name: docker-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: remote
+  namespace: tank-game
+spec:
+  selector:
+    app: remote
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

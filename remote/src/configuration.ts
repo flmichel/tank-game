@@ -8,5 +8,6 @@ export default {
   }),
 };
 
-export const apiBaseUrl = process.env.API_BASE_URL;
+export const apiBaseUrl =
+  process.env.API_BASE_URL ?? "https://tank-game.flmichel.duckdns.org/api";
 export const cors = process.env.CORS === "true" ? "cors" : "no-cors";

@@ -42,7 +42,7 @@ async fn main() -> Result<(), String> {
     let server_communicator = ServerCommunicator::new(
         sender_to_game,
         sender_to_player_connector,
-        "ws://localhost:5000",
+        "ws://tank-game.flmichel.duckdns.org/ws",
     );
     spawn(async move { server_communicator.start(receiver_server).await });
 
@@ -80,8 +80,10 @@ async fn main() -> Result<(), String> {
             match message {
                 MessageToGame::RoomId(id) => {
                     let mut game_state = world.write_resource::<State>();
-                    game_state.room_code =
-                        RoomCode::new(format!("http://localhost:80/?room-id={}", id.0).to_owned());
+                    game_state.room_code = RoomCode::new(
+                        format!("http://tank-game.flmichel.duckdns.org/?room-id={}", id.0)
+                            .to_owned(),
+                    );
                 }
                 MessageToGame::PlayerInput(player_input) => {
                     world.create_entity().with(player_input).build();

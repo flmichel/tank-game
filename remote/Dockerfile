@@ -6,7 +6,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 ENV CORS=false \
-    API_BASE_URL=https://tank-game.flmichel@duckdns.org/api
+    API_BASE_URL=https://tank-game.flmichel.duckdns.org/api
 
 # Stage 2: Create the production image with Nginx
 FROM nginx:latest
