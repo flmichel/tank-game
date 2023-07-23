@@ -23,17 +23,17 @@ jobs:
           password: ${{ secrets.HARBOR_PASSWORD }}
           registry: harbor.flmichel.duckdns.org/tank-game
 
-      #- name: Build and Push Docker Image
-      # run: |
-      #  # Your Docker build and push commands go here
-      # docker build -t harbor.flmichel.duckdns.org/tank-game/server:latest .
-      #docker push harbor.flmichel.duckdns.org/tank-game/server:latest
+      - name: Build and Push Docker Image
+        run: |
+          # Your Docker build and push commands go here
+          docker build -t harbor.flmichel.duckdns.org/tank-game/server:latest .
+          docker push harbor.flmichel.duckdns.org/tank-game/server:latest
 
-      - uses: azure/setup-kubectl@v3
-        with:
-          version: "v1.27.3"
-          kubeconfig: ${{ secrets.KUBECONFIG }}
-        id: install
+      #- uses: azure/setup-kubectl@v3
+      #  with:
+      #    version: "v1.27.3"
+      #    kubeconfig: ${{ secrets.KUBECONFIG }}
+      #  id: install
 
-      - name: Apply Kubernetes Manifests
-        run: kubectl apply -f manifests/
+      #- name: Apply Kubernetes Manifests
+      #  run: kubectl apply -f manifests/

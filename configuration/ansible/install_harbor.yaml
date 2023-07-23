@@ -27,7 +27,7 @@
 
     - name: Create secret for harbor
       command: |
-        kubectl create secret docker-registry harbor-credentials \
+        kubectl create secret docker-registry harbor-credentials -n tank-game \
         --docker-server=harbor.flmichel.duckdns.org \
         --docker-username=robot$kubernetes-tank-game \
-        --docker-password='''secret_password''' \
+        --docker-password=trbKFaX1b7VviFdpOj3EB30Wg6EWlSva \
