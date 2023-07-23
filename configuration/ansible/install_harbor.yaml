@@ -24,3 +24,10 @@
 
     - name: Install Harbor
       command: helm install harbor harbor/harbor -f $HOME/harbor-values.yaml -n harbor
+
+    - name: Create secret for harbor
+      command: |
+        kubectl create secret docker-registry harbor-credentials \
+        --docker-server=harbor.flmichel.duckdns.org \
+        --docker-username=robot$kubernetes-tank-game \
+        --docker-password='''secret_password''' \

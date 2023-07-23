@@ -1,0 +1,27 @@
+---
+- name: Copy files and execute kubectl commands
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Copy deploy-role.yaml to target machine
+      copy:
+        src: ../kubernetes/deploy-role.yaml
+        dest: /tmp/deploy-role.yaml
+
+    - name: Copy deploy-rolebinding.yaml to target machine
+      copy:
+        src: ../kubernetes/deploy-rolebinding.yaml
+        dest: /tmp/deploy-rolebinding.yaml
+
+    - name: Execute kubectl apply for deploy-role.yaml
+      shell: kubectl apply -f /tmp/deploy-role.yaml
+      ignore_errors: yes # Ignore errors if the resource already exists
+
+    - name: Execute kubectl apply for deploy-rolebinding.yaml
+      shell: kubectl apply -f /tmp/deploy-rolebinding.yaml
+      ignore_errors: yes # Ignore errors if the resource already exists
+
+    - name: Execute kubectl config view and save to kubeconfig
+      shell: kubectl config view --minify --flatten > /tmp/kubeconfig

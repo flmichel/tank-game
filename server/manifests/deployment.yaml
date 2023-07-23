@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tank-game-server-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tank-game-server
+  template:
+    metadata:
+      labels:
+        app: tank-game-server
+    spec:
+      containers:
+        - name: tank-game-server
+          image: harbor.flmichel.duckdns.org/tank-game/server:latest
+          ports:
+            - containerPort: 3000
+      imagePullSecrets:
+        - name: harbor-credentials
