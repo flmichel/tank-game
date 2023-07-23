@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  namespace: tank-game
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      containers:
+        - name: server
+          image: harbor.flmichel.duckdns.org/tank-game/server:latest
+          ports:
+            - containerPort: 5000
+            - containerPort: 8000
+      imagePullSecrets:
+        - name: docker-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: tank-game
+spec:
+  selector:
+    app: server
+  ports:
+    - name: websocket-game-room
+      protocol: TCP
+      port: 5000
+      targetPort: 5000
+    - name: web-app
+      protocol: TCP
+      port: 8000
+      targetPort: 8000

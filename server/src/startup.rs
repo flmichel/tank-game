@@ -37,11 +37,11 @@ pub async fn start_web_application(
     settings: &ApplicationSettings,
 ) -> Result<(), Error> {
     let app = Router::new()
-        .route("/login", post(login))
-        .route("/user/registration", post(create_user))
-        .route("/user/{name}", get(is_name_available))
-        .route("/user/email/{email}}", get(is_email_available))
-        .route("/game/:id", post(post_sdp_session))
+        .route("/api/login", post(login))
+        .route("/api/user/registration", post(create_user))
+        .route("/api/user/{name}", get(is_name_available))
+        .route("/api/user/email/{email}}", get(is_email_available))
+        .route("/api/game/:id", post(post_sdp_session))
         .layer(CorsLayer::permissive())
         .layer(Extension(Repo::<Account>::new(database_pool)))
         .with_state(room_map);

@@ -50,7 +50,7 @@ spec:
           image: postgres:latest
           env:
             - name: POSTGRES_DB
-              value: your_database_name
+              value: tank-game
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
