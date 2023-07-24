@@ -17,11 +17,20 @@ export class ConfigureGameChannel implements Action {
     console.log("channel created");
 
     peerConnection.onicecandidate = (event) => {
-      console.log("onicecandidate");
-      if (event.candidate && state.game.sdpOffer === null) {
+      console.log(
+        "onicecandidate",
+        event.candidate,
+        peerConnection.localDescription
+      );
+      if (
+        event.candidate &&
+        state.game.sdpOffer === null &&
+        hasNonLocalCandidate(peerConnection.localDescription!)
+      ) {
         console.log("got plain offer", peerConnection.localDescription);
         let sdpOffer = btoa(JSON.stringify(peerConnection.localDescription));
         state.game.sdpOffer = sdpOffer;
+        console.log(sdpOffer);
         state.pendingRequests.add(new SdpOffer(sdpOffer, this.gameRoomId));
         trigger(new Reload());
       }
@@ -70,4 +79,34 @@ export class ConnectToRoom implements Action {
     };
     state.game.channel = channel;
   }
+}
+
+function hasNonLocalCandidate(
+  sessionDescription: RTCSessionDescription
+): boolean {
+  // Get the SDP from the RTCSessionDescription
+  const sdp: string = sessionDescription.sdp;
+
+  // Split the SDP into lines to iterate through each line
+  const sdpLines: string[] = sdp.split("\r\n");
+
+  // Check each line to find a candidate with a non-localhost IP address
+  for (const line of sdpLines) {
+    if (line.startsWith("a=candidate")) {
+      const candidateFields: string[] = line.split(" ");
+      const ipAddress: string = candidateFields[4];
+
+      // Check if the candidate has a non-localhost IP address
+      if (
+        ipAddress !== "0.0.0.0" &&
+        ipAddress !== "127.0.0.1" &&
+        !ipAddress.endsWith(".local")
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // If no non-localhost candidate is found, return false
+  return false;
 }
