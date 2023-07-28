@@ -7,7 +7,10 @@ use webrtc::{
         APIBuilder, API,
     },
     data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel},
-    ice_transport::ice_server::RTCIceServer,
+    ice_transport::{
+        ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
+        ice_server::RTCIceServer,
+    },
     interceptor::registry::Registry,
     peer_connection::{
         configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,

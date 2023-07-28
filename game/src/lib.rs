@@ -1,5 +1,4 @@
 pub mod components;
-pub mod controllers;
 pub mod error;
 pub mod game;
 pub mod players_connector;
