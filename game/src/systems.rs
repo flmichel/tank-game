@@ -1,7 +1,7 @@
-use specs::{Entities, Join, ReadStorage, System, WriteExpect, WriteStorage};
+use specs::{Entities, Entity, Join, ReadStorage, System, WriteExpect, WriteStorage};
 
 use crate::{
-    components::{Circle, Movement, Player, Position, ReadyStatus},
+    components::{AimStatus, Bullet, Circle, Movement, Player, Position, ReadyStatus, ShootStatus},
     remotes::{ConfigurationInput, GameInput, PlayerInput, RemoteInput},
     state::{
         game_state::{Phase, State},
@@ -16,16 +16,12 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
         Entities<'a>,
         ReadStorage<'a, PlayerInput>,
         WriteStorage<'a, Player>,
-        WriteStorage<'a, Movement>,
-        WriteStorage<'a, Position>,
     );
 
-    fn run(
-        &mut self,
-        (entities, player_inputs, mut players, mut movements, mut positions): Self::SystemData,
-    ) {
+    fn run(&mut self, (entities, player_inputs, mut players): Self::SystemData) {
         for (entity, input) in (&entities, &player_inputs).join() {
             let player = self.retrieve_player(&mut players, input.player_id);
+            println!("player inputs: {:?}", input);
 
             // Update the players next input
             if let Some(player) = player {
@@ -75,20 +71,26 @@ impl<'a> System<'a> for HandleInputs {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, Player>,
+        WriteStorage<'a, Bullet>,
         WriteStorage<'a, Movement>,
         WriteStorage<'a, Position>,
         WriteStorage<'a, Circle>,
         WriteExpect<'a, State>,
     );
 
-    fn run(&mut self, (entities, players, movements, positions, circles, state): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, players, bullet, movements, positions, circles, state): Self::SystemData,
+    ) {
         match state.phase {
             Phase::BeforeNextGame | Phase::BreakInGame => self.handle_configuration_inputs(
                 entities, players, movements, positions, circles, state,
             ),
             Phase::InGame => {
                 let (players, movements) = self.handle_game_inputs(players, movements);
-                self.update_game(circles, movements, positions, state);
+                self.update_game(
+                    entities, players, bullet, circles, movements, positions, state,
+                );
             }
         }
     }
@@ -157,17 +159,29 @@ impl HandleInputs {
         mut movements: WriteStorage<'a, Movement>,
     ) -> (WriteStorage<'a, Player>, WriteStorage<'a, Movement>) {
         for (player, movement) in (&mut players, &mut movements).join() {
-            match &player.next_input {
+            match player.next_input {
                 RemoteInput::GameInput(GameInput::Move(direction)) => {
-                    movement.set_player_direction(*direction);
+                    movement.set_player_direction(direction);
                 }
                 RemoteInput::GameInput(GameInput::Stop) => movement.stop(),
-                RemoteInput::GameInput(_) => print!("not implemented yet"),
+                RemoteInput::GameInput(GameInput::Aim(direction)) => {
+                    player.aim = AimStatus::Aim(direction);
+                }
+                RemoteInput::GameInput(GameInput::Shoot) => {
+                    if player.shoot == ShootStatus::CanShoot {
+                        println!("Player is gonna shoot");
+                        player.shoot = ShootStatus::Shooting;
+                    } else {
+                        player.aim = AimStatus::None;
+                    }
+                }
                 RemoteInput::ConfigurationInput(_) => {
                     println!("configuration input not allowed: game has started")
                 }
                 RemoteInput::NoInput => {}
             }
+
+            player.next_input = RemoteInput::NoInput;
         }
 
         (players, movements)
@@ -175,15 +189,56 @@ impl HandleInputs {
 
     fn update_game<'a>(
         &self,
+        entities: Entities<'a>,
+        mut players: WriteStorage<Player>,
+        mut bullets: WriteStorage<'a, Bullet>,
         mut circles: WriteStorage<'a, Circle>,
         mut movements: WriteStorage<'a, Movement>,
         mut positions: WriteStorage<'a, Position>,
-        mut state: WriteExpect<'a, State>,
+        state: WriteExpect<'a, State>,
     ) {
+        // Wall detection
         for (circle, movement, position) in (&mut circles, &mut movements, &mut positions).join() {
             let next_position = position.next(movement);
             if !has_wall_collision(&next_position, circle, &state.map) {
                 position.update(&next_position);
+            }
+        }
+
+        // Generate new bullets
+        let mut new_bullets = vec![];
+        for (player, position) in (&mut players, &positions).join() {
+            if player.shoot == ShootStatus::Shooting {
+                match player.aim {
+                    AimStatus::Aim(direction) => new_bullets.push(BulletData {
+                        entity: entities.create(),
+                        bullet: Bullet::new(player.id),
+                        position: position.clone(),
+                        movement: Movement::new_bullet_movement(direction),
+                        circle: Circle::new_bullet_circle(),
+                    }),
+                    AimStatus::None => {
+                        println!("player must be aiming when shooting")
+                    }
+                }
+                player.update_after_shot();
+            }
+        }
+        for bullet in new_bullets {
+            bullets.insert(bullet.entity, bullet.bullet).unwrap();
+            positions.insert(bullet.entity, bullet.position).unwrap();
+            movements.insert(bullet.entity, bullet.movement).unwrap();
+            circles.insert(bullet.entity, bullet.circle).unwrap();
+        }
+
+        // Update players
+        for player in (&mut players).join() {
+            if let ShootStatus::FrameLeftUntilNextShot(number_of_frames) = player.shoot {
+                if number_of_frames > 0 {
+                    player.shoot = ShootStatus::FrameLeftUntilNextShot(number_of_frames - 1);
+                } else {
+                    player.shoot = ShootStatus::CanShoot;
+                }
             }
         }
     }
@@ -206,4 +261,12 @@ fn has_wall_collision(position: &Position, circle: &Circle, map: &Map) -> bool {
         || map.is_wall(right_block)
         || map.is_wall(top_block)
         || map.is_wall(bottom_block)
+}
+
+struct BulletData {
+    entity: Entity,
+    bullet: Bullet,
+    position: Position,
+    movement: Movement,
+    circle: Circle,
 }

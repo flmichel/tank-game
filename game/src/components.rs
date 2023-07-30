@@ -3,10 +3,13 @@ use specs_derive::Component;
 
 use crate::{remotes::RemoteInput, render::renderer};
 
-const BLOCK_PER_SECOND: f64 = 0.5;
+const PLAYER_BLOCKS_PER_SECOND: f64 = 0.5;
+const BULLET_BLOCKS_PER_SECOND: f64 = 1.;
 const DEFAULT_PLAYER_RADIUS: f64 = 0.1;
+const DEFAULT_BULLET_RADIUS: f64 = 0.05;
+const NUMBER_OF_FRAMES_BETWEEN_SHOTS: u32 = 15;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 #[storage(VecStorage)]
 pub struct Position {
     pub x: f64,
@@ -45,9 +48,16 @@ impl Movement {
         }
     }
 
+    pub fn new_bullet_movement(direction: f64) -> Movement {
+        Movement {
+            direction,
+            speed: BULLET_BLOCKS_PER_SECOND / renderer::FRAME_PER_SECOND as f64,
+        }
+    }
+
     pub fn set_player_direction(&mut self, direction: f64) {
         self.direction = direction;
-        self.speed = BLOCK_PER_SECOND / renderer::FRAME_PER_SECOND as f64;
+        self.speed = PLAYER_BLOCKS_PER_SECOND / renderer::FRAME_PER_SECOND as f64;
     }
 
     pub fn stop(&mut self) {
@@ -68,6 +78,12 @@ impl Circle {
         }
     }
 
+    pub fn new_bullet_circle() -> Circle {
+        Circle {
+            radius: DEFAULT_BULLET_RADIUS,
+        }
+    }
+
     pub fn get_size(&self) -> f64 {
         self.radius * 2.
     }
@@ -83,8 +99,22 @@ pub struct Player {
     pub id: u32,
     pub name: String,
     pub status: ReadyStatus,
-    pub milliseconds_until_next_shot: i32,
+    pub aim: AimStatus,
+    pub shoot: ShootStatus,
     pub next_input: RemoteInput,
+}
+
+#[derive(PartialEq)]
+pub enum AimStatus {
+    Aim(f64),
+    None,
+}
+
+#[derive(PartialEq)]
+pub enum ShootStatus {
+    CanShoot,
+    Shooting,
+    FrameLeftUntilNextShot(u32),
 }
 
 impl Player {
@@ -93,7 +123,8 @@ impl Player {
             id,
             name,
             status: ReadyStatus::NotReady,
-            milliseconds_until_next_shot: 0,
+            aim: AimStatus::None,
+            shoot: ShootStatus::CanShoot,
             next_input: RemoteInput::NoInput,
         }
     }
@@ -101,10 +132,27 @@ impl Player {
     pub fn is_ready(&self) -> bool {
         self.status == ReadyStatus::Ready
     }
+
+    pub fn update_after_shot(&mut self) {
+        self.aim = AimStatus::None;
+        self.shoot = ShootStatus::FrameLeftUntilNextShot(NUMBER_OF_FRAMES_BETWEEN_SHOTS);
+    }
 }
 
 #[derive(PartialEq)]
 pub enum ReadyStatus {
     Ready,
     NotReady,
+}
+
+#[derive(Component)]
+#[storage(VecStorage)]
+pub struct Bullet {
+    owner_id: u32,
+}
+
+impl Bullet {
+    pub fn new(owner_id: u32) -> Bullet {
+        Bullet { owner_id }
+    }
 }

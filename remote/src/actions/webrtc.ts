@@ -1,5 +1,4 @@
-import { SdpOffer } from "../api/webrtc";
-import { NUMBER_OF_ICE_CANDIDATES } from "../configuration";
+import { SdpOffer } from "../api/game";
 import { state } from "../state/state";
 import { Action, Reload, trigger } from "./actions";
 
@@ -25,10 +24,7 @@ export class ConfigureGameChannel implements Action {
       if (
         event.candidate &&
         state.game.sdpOffer === null &&
-        hasNNonLocalCandidates(
-          peerConnection.localDescription!,
-          NUMBER_OF_ICE_CANDIDATES
-        )
+        hasNonLocalCandidate(peerConnection.localDescription!)
       ) {
         console.log("got plain offer", peerConnection.localDescription);
         let sdpOffer = btoa(JSON.stringify(peerConnection.localDescription));
@@ -72,18 +68,14 @@ export class ConnectToRoom implements Action {
   }
 }
 
-function hasNNonLocalCandidates(
-  sessionDescription: RTCSessionDescription,
-  n: number
+function hasNonLocalCandidate(
+  sessionDescription: RTCSessionDescription
 ): boolean {
   // Get the SDP from the RTCSessionDescription
   const sdp: string = sessionDescription.sdp;
 
   // Split the SDP into lines to iterate through each line
   const sdpLines: string[] = sdp.split("\r\n");
-
-  // Initialize a counter for non-localhost candidates
-  let nonLocalCandidateCount = 0;
 
   // Check each line to find a candidate with a non-localhost IP address
   for (const line of sdpLines) {
@@ -97,16 +89,11 @@ function hasNNonLocalCandidates(
         ipAddress !== "127.0.0.1" &&
         !ipAddress.endsWith(".local")
       ) {
-        nonLocalCandidateCount++;
-
-        // If we have found at least n non-localhost candidates, return true
-        if (nonLocalCandidateCount >= n) {
-          return true;
-        }
+        return true;
       }
     }
   }
 
-  // If we haven't found n non-localhost candidates, return false
+  // If no non-localhost candidate is found, return false
   return false;
 }

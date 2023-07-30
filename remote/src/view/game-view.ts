@@ -9,7 +9,7 @@ import { DisplayState } from "../state/displayState";
 
 @customElement("game-view")
 export class View extends LitElement {
-  @property()
+  @property({ type: Object })
   state!: DisplayState;
 
   render() {
@@ -22,9 +22,7 @@ export class View extends LitElement {
         `;
       case GamePhase.InGame:
         console.log("InGame phase updated");
-        return html`
-          <remote-canvas .state=${this.state.displaySettings}></remote-canvas>
-        `;
+        return html` <remote-canvas .state=${this.state}></remote-canvas> `;
       default:
         return html` <p>this is not normal</p> `;
     }

@@ -1,8 +1,6 @@
 import { RouteBack, trigger } from "../actions/actions";
 import { SetWindowSize } from "../actions/display";
 import { ConfigureGameChannel } from "../actions/webrtc";
-import configuration from "../configuration";
-import { state } from "../state/state";
 
 export default function addAllEventListeners() {
   window.onpopstate = function () {
@@ -18,5 +16,8 @@ export default function addAllEventListeners() {
     }
   };
 
-  window.addEventListener("resize", (event) => trigger(new SetWindowSize()));
+  window.addEventListener("resize", (event) => {
+    console.log("trigger resize event");
+    trigger(new SetWindowSize());
+  });
 }

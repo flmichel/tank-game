@@ -10,7 +10,7 @@ import {
 
 @customElement("game-configuration")
 export class CanvasTouch extends LitElement {
-  @property({ reflect: true })
+  @property({ type: Object, reflect: true })
   state!: GameState;
 
   render() {

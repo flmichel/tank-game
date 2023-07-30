@@ -1,4 +1,4 @@
-import { apiBaseUrl, cors } from "../configuration";
+import configuration from "../configuration";
 
 export class PendingRequests {
   requestHandlers: RequestHandler[] = [];
@@ -16,9 +16,9 @@ export class PendingRequests {
   async process(requestHandler: RequestHandler) {
     let request = requestHandler.formRequest();
     console.log("Execute request: ", request);
-    const response = await fetch(apiBaseUrl + request.path, {
+    const response = await fetch(configuration.apiBaseUrl + request.path, {
       method: request.method,
-      mode: cors,
+      mode: configuration.cors ? "cors" : "no-cors",
       body: JSON.stringify(request.body),
     });
 

@@ -1,6 +1,5 @@
 import { html, css, LitElement } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { Authentication, AuthenticationState, State } from "../state/state";
 import { trigger, Route } from "../actions/actions";
 import { DisplayState } from "../state/displayState";
 
@@ -12,7 +11,7 @@ export class Navbar extends LitElement {
     }
   `;
 
-  @property({ reflect: true })
+  @property({ type: Object, reflect: true })
   state!: DisplayState;
 
   render() {

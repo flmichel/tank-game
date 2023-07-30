@@ -1,4 +1,4 @@
-import { sendStringToGame, sendToGame } from "../api/webrtc";
+import { sendStringToGame, sendToGame } from "../api/game";
 import { GamePhase, state } from "../state/state";
 import { Action } from "./actions";
 

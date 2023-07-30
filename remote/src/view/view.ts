@@ -14,18 +14,17 @@ export class View extends LitElement {
     }
   `;
 
-  @property()
+  @property({ type: Object })
   state: DisplayState = computeDisplayState(state);
 
   updateState(newState: State) {
-    this.state = computeDisplayState(state);
+    this.state = computeDisplayState(newState);
     this.requestUpdate();
   }
 
   render() {
     return html` <div>
       <nav-bar .state=${this.state}></nav-bar>
-      <game-view .state=${this.state}></game-view>
       ${this.renderPage(this.state.route)}
     </div>`;
   }

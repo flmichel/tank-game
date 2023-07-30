@@ -1,7 +1,7 @@
 import { trigger } from "../actions/actions";
 import { ConnectToRoom } from "../actions/webrtc";
 import { state } from "../state/state";
-import { HttpError, HttpMethod, HttpRequest, RequestHandler } from "./fetch";
+import { HttpError, HttpMethod, HttpRequest, RequestHandler } from "./server";
 
 export class SdpOffer implements RequestHandler {
   offer: string;

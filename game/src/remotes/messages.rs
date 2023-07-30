@@ -3,14 +3,14 @@ use specs::Component;
 use specs::VecStorage;
 use specs_derive::Component;
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 #[storage(VecStorage)]
 pub struct PlayerInput {
     pub player_id: u32,
     pub remote_input: RemoteInput,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum RemoteInput {
     GameInput(GameInput),
@@ -18,17 +18,16 @@ pub enum RemoteInput {
     NoInput,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub enum GameInput {
     Aim(f64),
-    Shoot(f64),
-    Bomb,
+    Shoot,
     Stop,
     Move(f64),
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub enum ConfigurationInput {
     Ready,

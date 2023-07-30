@@ -1,5 +1,5 @@
 import { Point } from "../actions/remote";
-import { PendingRequests } from "../api/fetch";
+import { PendingRequests } from "../api/server";
 import configuration from "../configuration";
 
 export interface State {
@@ -55,11 +55,11 @@ export enum GamePhase {
 }
 
 interface Remote {
-  leftController: LeftController;
-  rightController: null;
+  leftController: Controller;
+  rightController: Controller;
 }
 
-interface LeftController {
+interface Controller {
   startingPoint: Point | null;
 }
 
@@ -73,7 +73,10 @@ export let state: State = {
   authentication: {
     authenticationState: AuthenticationState.LoggedOut,
   },
-  remote: { leftController: { startingPoint: null }, rightController: null },
+  remote: {
+    leftController: { startingPoint: null },
+    rightController: { startingPoint: null },
+  },
   game: {
     isChannelOpen: false,
     roomId: null,

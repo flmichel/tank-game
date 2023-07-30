@@ -1,5 +1,5 @@
 use futures_channel::mpsc::unbounded;
-use game::components::{Circle, Movement, Player, Position};
+use game::components::{Bullet, Circle, Movement, Player, Position};
 use game::game::{MessageToGame, RoomId};
 use game::remotes::PlayerInput;
 use game::render::renderer::SystemData;
@@ -62,6 +62,10 @@ async fn main() -> Result<(), String> {
         .load_texture("assets/grin.png")
         .expect("Failed to load player face");
 
+    let missile = texture_creator
+        .load_texture("assets/missile.png")
+        .expect("Failed to load missile");
+
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -79,10 +83,11 @@ async fn main() -> Result<(), String> {
         if let Ok(Some(message)) = receiver_game.try_next() {
             match message {
                 MessageToGame::RoomId(id) => {
+                    println!("got id from server: {}", id.0);
                     let mut game_state = world.write_resource::<State>();
                     game_state.room_code = RoomCode::new(
-                        format!("http://tank-game.flmichel.duckdns.org/?room-id={}", id.0)
-                            .to_owned(),
+                        //format!("http://tank-game.flmichel.duckdns.org/?room-id={}", id.0).to_owned(),
+                        format!("http://192.168.0.108:8080/?room-id={}", id.0).to_owned(),
                     );
                 }
                 MessageToGame::PlayerInput(player_input) => {
@@ -92,6 +97,7 @@ async fn main() -> Result<(), String> {
         }
 
         dispatcher.dispatch(&mut world);
+        world.maintain();
 
         // Render
         renderer::render(
@@ -99,6 +105,7 @@ async fn main() -> Result<(), String> {
             SystemData::new(world.system_data()),
             &font,
             &player_face,
+            &missile,
         )?;
 
         // Time management
@@ -119,6 +126,7 @@ fn create_world(window: &Window) -> World {
     world.register::<Movement>();
     world.register::<Circle>();
     world.register::<Player>();
+    world.register::<Bullet>();
 
     let game_state = State {
         room_code: RoomCode::new("Error, the game could not connect to server".to_owned()),

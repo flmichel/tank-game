@@ -1,39 +1,75 @@
-import { sendStringToGame, sendToGame } from "../api/webrtc";
+import { sendStringToGame, sendToGame } from "../api/game";
 import { state } from "../state/state";
 import { Action, trigger } from "./actions";
 
 export class SetControllerCenter implements Action {
   startingPoint: Point;
+  controllerId: ControllerId;
 
-  constructor(startingPoint: Point) {
+  constructor(controllerId: ControllerId, startingPoint: Point) {
     this.startingPoint = startingPoint;
+    this.controllerId = controllerId;
   }
 
   execute(): void {
-    state.remote.leftController.startingPoint = this.startingPoint;
+    if (this.controllerId == ControllerId.MOVEMENT) {
+      state.remote.leftController.startingPoint = this.startingPoint;
+    } else {
+      state.remote.rightController.startingPoint = this.startingPoint;
+    }
   }
 }
 
 export class SetControllerDirection implements Action {
   currentPoint: Point;
+  controllerId: ControllerId;
 
-  constructor(currentPoint: Point) {
+  constructor(controllerId: ControllerId, currentPoint: Point) {
     this.currentPoint = currentPoint;
+    this.controllerId = controllerId;
   }
 
   execute(): void {
     if (!state.remote.leftController.startingPoint) return;
-    let radianDirection =
-      state.remote.leftController.startingPoint!.getDirectionInRadians(
-        this.currentPoint
-      );
-    sendToGame({ move: radianDirection });
+
+    if (this.controllerId == ControllerId.MOVEMENT) {
+      let radianDirection =
+        state.remote.leftController.startingPoint!.getDirectionInRadians(
+          this.currentPoint
+        );
+      sendToGame({ move: radianDirection });
+    } else {
+      let radianDirection =
+        state.remote.rightController.startingPoint!.getDirectionInRadians(
+          this.currentPoint
+        );
+      sendToGame({ aim: radianDirection });
+    }
   }
 }
 
 export class StopController implements Action {
+  controllerId: ControllerId;
+  lastLocation: Point | null;
+
+  constructor(controllerId: ControllerId, lastLocation: Point | null) {
+    this.controllerId = controllerId;
+    this.lastLocation = lastLocation;
+  }
+
   execute(): void {
-    sendStringToGame("stop");
+    if (this.controllerId == ControllerId.MOVEMENT) {
+      sendStringToGame("stop");
+    } else {
+      if (this.lastLocation !== null) {
+        let radianDirection =
+          state.remote.rightController.startingPoint!.getDirectionInRadians(
+            this.lastLocation
+          );
+        sendToGame({ aim: radianDirection });
+        sendStringToGame("shoot");
+      }
+    }
   }
 }
 
@@ -69,11 +105,7 @@ export class CanvasData {
   lastCenter: Point | null = null;
   lastUpdateTime: number | null = null;
 
-  constructor(
-    controllerId: ControllerId,
-    shadowRoot: ShadowRoot,
-    touchedControllers: Map<ControllerId, number>
-  ) {
+  constructor(controllerId: ControllerId, shadowRoot: ShadowRoot) {
     this.controllerId = controllerId;
     const canvas = shadowRoot?.querySelector(
       "#" + controllerId
@@ -97,27 +129,39 @@ export class CanvasData {
     console.log("start drawing touch", this.touchIdentifier, event.touches);
 
     this.isDrawing = true;
-    this.lastLocation = new Point(
+    this.lastCenter = new Point(
       touch.clientX - this.canvas.offsetLeft,
       touch.clientY - this.canvas.offsetTop
     );
-    this.lastCenter = this.lastLocation;
-    trigger(new SetControllerCenter(this.lastCenter));
+    trigger(new SetControllerCenter(this.controllerId, this.lastCenter));
   }
 
   touchMove(event: TouchEvent) {
     event.preventDefault();
     if (this.isDrawing) {
       let touch = this.retrieveTouch(event)!;
+
+      if (!this.lastLocation) {
+        this.lastLocation = new Point(
+          touch.clientX - this.canvas.offsetLeft,
+          touch.clientY - this.canvas.offsetTop
+        );
+      }
+
       const currentX = touch.clientX - this.canvas.offsetLeft;
       const currentY = touch.clientY - this.canvas.offsetTop;
       const currentLocation = new Point(currentX, currentY);
 
       let currentTime = new Date().getTime();
-      if (!this.lastUpdateTime || this.lastUpdateTime + 100 < currentTime) {
-        trigger(new SetControllerDirection(currentLocation));
-        if (this.lastLocation!.getDistanceFrom(this.lastCenter!) > 15) {
-          trigger(new SetControllerCenter(this.lastLocation!));
+      if (!this.lastUpdateTime || this.lastUpdateTime + 80 < currentTime) {
+        trigger(new SetControllerDirection(this.controllerId, currentLocation));
+        if (
+          this.lastLocation!.getDistanceFrom(this.lastCenter!) > 25 &&
+          this.controllerId == ControllerId.MOVEMENT
+        ) {
+          trigger(
+            new SetControllerCenter(this.controllerId, this.lastLocation!)
+          );
           this.lastCenter = this.lastLocation;
         }
         this.lastUpdateTime = currentTime;
@@ -134,10 +178,12 @@ export class CanvasData {
   touchEnd(event: TouchEvent) {
     event.preventDefault();
     this.isDrawing = false;
-    trigger(new StopController());
-    console.log("end drawing touch", this.touchIdentifier, event.touches);
+    console.log("touchEnd", this.lastLocation);
+    trigger(new StopController(this.controllerId, this.lastLocation));
     TouchIndex.updateIndex(event);
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.lastLocation = null;
+    this.lastCenter = null;
   }
 
   retrieveTouch(event: TouchEvent): Touch | undefined {

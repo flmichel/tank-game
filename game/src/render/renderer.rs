@@ -5,7 +5,7 @@ use sdl2::{
     ttf::Font,
     video::Window,
 };
-use specs::{Join, ReadExpect, ReadStorage};
+use specs::{Entities, Join, ReadExpect, ReadStorage};
 
 use crate::{
     components::*,
@@ -22,11 +22,15 @@ type SystemDataType<'a> = (
     ReadStorage<'a, Position>,
     ReadStorage<'a, Circle>,
     ReadStorage<'a, Player>,
+    ReadStorage<'a, Bullet>,
+    Entities<'a>,
 );
 
 pub struct SystemData<'a> {
     system_data: SystemDataType<'a>,
 }
+
+const AIMING_LINE_LENGTH: f64 = 2.;
 
 impl<'a> SystemData<'a> {
     pub fn new(system_data: SystemDataType<'a>) -> Self {
@@ -47,6 +51,14 @@ impl<'a> SystemData<'a> {
     fn get_players(&self) -> &ReadStorage<'a, Player> {
         &self.system_data.3
     }
+
+    fn get_bullets(&self) -> &ReadStorage<'a, Bullet> {
+        &self.system_data.4
+    }
+
+    fn get_entities(&self) -> &Entities<'a> {
+        &self.system_data.5
+    }
 }
 
 pub fn render(
@@ -54,12 +66,13 @@ pub fn render(
     data: SystemData,
     font: &Font,
     player_face: &Texture,
+    missile: &Texture,
 ) -> Result<(), String> {
     match data.get_state().phase {
         Phase::BeforeNextGame => {
             render_before_game(assets, data, font, player_face);
         }
-        Phase::InGame => render_game(assets, data, font, player_face),
+        Phase::InGame => render_game(assets, data, font, player_face, missile),
         Phase::BreakInGame => {}
     }
 
@@ -129,7 +142,13 @@ fn render_before_game(assets: &mut Assets, data: SystemData, font: &Font, player
     canvas.present();
 }
 
-fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: &Texture) {
+fn render_game(
+    assets: &mut Assets,
+    data: SystemData,
+    font: &Font,
+    player_face: &Texture,
+    missile: &Texture,
+) {
     let canvas = &mut assets.canvas;
 
     canvas.set_draw_color(Color::RGB(173, 216, 150));
@@ -139,44 +158,57 @@ fn render_game(assets: &mut Assets, data: SystemData, font: &Font, player_face: 
 
     render_map(map, canvas);
 
-    for (player, position, circle) in
-        (data.get_players(), data.get_position(), data.get_circle()).join()
+    for (entity, position, circle) in
+        (data.get_entities(), data.get_position(), data.get_circle()).join()
     {
-        // Render player face next to the circle
+        let player = data.get_players().get(entity);
+        // Render the different circles: players + bullets
+        let texture: &Texture;
         let face_dest_rect = Rect::new(
             ((position.x - circle.get_radius()) * map.block_size() as f64) as i32,
             ((position.y - circle.get_radius()) * map.block_size() as f64) as i32,
             (circle.get_size() * map.block_size() as f64) as u32,
             (circle.get_size() * map.block_size() as f64) as u32,
         );
-        canvas.copy(player_face, None, face_dest_rect).unwrap();
 
-        // Render player name next to the circle
-        let texture_creator = canvas.texture_creator();
+        if player.is_some() {
+            texture = player_face;
+        } else {
+            texture = missile;
+        }
+        canvas.copy(texture, None, face_dest_rect).unwrap();
 
-        let surface = font
-            .render(&player.name)
-            .blended(Color::RGBA(255, 0, 0, 255))
-            .map_err(|e| e.to_string())
-            .unwrap();
-        let texture = texture_creator
-            .create_texture_from_surface(&surface)
-            .map_err(|e| e.to_string())
-            .unwrap();
-        let font_rect = texture.query();
+        if let Some(player) = player {
+            // Render player name next to the circle
+            let texture_creator = canvas.texture_creator();
 
-        canvas
-            .copy(
-                &texture,
-                None,
-                Rect::new(
-                    (position.x * map.block_size() as f64) as i32,
-                    (position.y * map.block_size() as f64) as i32,
-                    font_rect.width,
-                    font_rect.height,
-                ),
-            )
-            .unwrap();
+            let surface = font
+                .render(&player.name)
+                .blended(Color::RGBA(255, 0, 0, 255))
+                .map_err(|e| e.to_string())
+                .unwrap();
+            let texture = texture_creator
+                .create_texture_from_surface(&surface)
+                .map_err(|e| e.to_string())
+                .unwrap();
+            let font_rect = texture.query();
+
+            canvas
+                .copy(
+                    &texture,
+                    None,
+                    Rect::new(
+                        (position.x * map.block_size() as f64) as i32,
+                        (position.y * map.block_size() as f64) as i32,
+                        font_rect.width,
+                        font_rect.height,
+                    ),
+                )
+                .unwrap();
+
+            // Render the player line when aiming
+            render_aiming_line(canvas, position, &player.aim, map.block_size());
+        }
     }
 
     canvas.present();
@@ -209,5 +241,30 @@ fn render_map(map: &Map, canvas: &mut Canvas<Window>) {
                 }
             }
         }
+    }
+}
+
+fn render_aiming_line(
+    canvas: &mut Canvas<Window>,
+    position: &Position,
+    aim: &AimStatus,
+    map_block_size: u32,
+) {
+    if let AimStatus::Aim(direction) = aim {
+        // Calculate the line start position
+        let start_x = (position.x * map_block_size as f64) as i32;
+        let start_y = (position.y * map_block_size as f64) as i32;
+
+        // Calculate the line end position based on the direction and length
+        let end_x =
+            ((position.x + direction.cos() * AIMING_LINE_LENGTH) * map_block_size as f64) as i32;
+        let end_y =
+            ((position.y + direction.sin() * AIMING_LINE_LENGTH) * map_block_size as f64) as i32;
+
+        // Render the player line (thin line, 2 blocks long)
+        canvas.set_draw_color(Color::RGBA(0, 255, 0, 255)); // Green color (adjust as needed)
+        canvas
+            .draw_line((start_x, start_y), (end_x, end_y))
+            .unwrap();
     }
 }
