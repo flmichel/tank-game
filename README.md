@@ -3,9 +3,9 @@
 The gaming platform is composed of the different elements:
 
 1. A player
-2. A remote.md
-3. A [game](game.md)
-4. A server_api.md
+2. A remote
+3. A [game](documentation/game.md)
+4. A server api
 5. A stun server
 
-![](diagram/context.svg)
+![](documentation/diagram/context.svg)
