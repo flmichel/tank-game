@@ -1,3 +1,6 @@
+use std::f32::consts::PI;
+
+use sdl2::rect::Point;
 use specs::{Component, VecStorage};
 use specs_derive::Component;
 
@@ -7,6 +10,7 @@ const PLAYER_BLOCKS_PER_SECOND: f64 = 0.5;
 const BULLET_BLOCKS_PER_SECOND: f64 = 1.;
 const DEFAULT_PLAYER_RADIUS: f64 = 0.1;
 const DEFAULT_BULLET_RADIUS: f64 = 0.05;
+const DEFAULT_HIT_POINTS_NUMBER: u32 = 20;
 const NUMBER_OF_FRAMES_BETWEEN_SHOTS: u32 = 15;
 
 #[derive(Component, Clone)]
@@ -69,18 +73,21 @@ impl Movement {
 #[storage(VecStorage)]
 pub struct Circle {
     radius: f64,
+    pub hit_points: Vec<Position>,
 }
 
 impl Circle {
     pub fn new_player_circle() -> Circle {
         Circle {
             radius: DEFAULT_PLAYER_RADIUS,
+            hit_points: Self::build_hit_points(DEFAULT_PLAYER_RADIUS),
         }
     }
 
     pub fn new_bullet_circle() -> Circle {
         Circle {
             radius: DEFAULT_BULLET_RADIUS,
+            hit_points: Self::build_hit_points(DEFAULT_BULLET_RADIUS),
         }
     }
 
@@ -91,12 +98,28 @@ impl Circle {
     pub fn get_radius(&self) -> f64 {
         self.radius
     }
+
+    pub fn build_hit_points(radius: f64) -> Vec<Position> {
+        let mut circle_points = Vec::new();
+        let center_x = 0.0; // Assuming the circle is centered at the origin (0, 0)
+        let center_y = 0.0;
+
+        for i in 0..DEFAULT_HIT_POINTS_NUMBER {
+            let angle = (i as f64 / DEFAULT_HIT_POINTS_NUMBER as f64) * 2.0 * PI as f64;
+            let x = center_x + radius * angle.cos();
+            let y = center_y + radius * angle.sin();
+            circle_points.push(Position { x, y });
+        }
+
+        circle_points
+    }
 }
 
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Player {
-    pub id: u32,
+    pub socket_id: u32,
+    pub id: String,
     pub name: String,
     pub status: ReadyStatus,
     pub aim: AimStatus,
@@ -118,10 +141,11 @@ pub enum ShootStatus {
 }
 
 impl Player {
-    pub fn new(id: u32, name: String) -> Player {
+    pub fn new(socket_id: u32, id: String) -> Player {
         Player {
+            socket_id,
             id,
-            name,
+            name: String::new(),
             status: ReadyStatus::NotReady,
             aim: AimStatus::None,
             shoot: ShootStatus::CanShoot,
@@ -148,11 +172,11 @@ pub enum ReadyStatus {
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Bullet {
-    owner_id: u32,
+    owner_id: String,
 }
 
 impl Bullet {
-    pub fn new(owner_id: u32) -> Bullet {
+    pub fn new(owner_id: String) -> Bullet {
         Bullet { owner_id }
     }
 }

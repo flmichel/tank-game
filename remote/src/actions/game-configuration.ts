@@ -28,3 +28,27 @@ export class ToggleReady implements Action {
     }
   }
 }
+
+export class SignalUserId implements Action {
+  execute(): void {
+    let roomId = state.game.roomId!;
+    let playerId = localStorage.getItem(roomId);
+    if (playerId === null) {
+      playerId = generateRandomId();
+      localStorage.setItem(roomId, playerId);
+    }
+    state.game.playerId = playerId;
+    sendToGame({ playerId: playerId });
+  }
+}
+
+function generateRandomId(): string {
+  const randomBytes = new Uint8Array(16);
+  window.crypto.getRandomValues(randomBytes);
+  const base64 = btoa(String.fromCharCode.apply(null, Array.from(randomBytes)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+
+  return base64;
+}

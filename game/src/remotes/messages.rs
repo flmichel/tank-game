@@ -6,7 +6,7 @@ use specs_derive::Component;
 #[derive(Component, Debug)]
 #[storage(VecStorage)]
 pub struct PlayerInput {
-    pub player_id: u32,
+    pub socket_id: u32,
     pub remote_input: RemoteInput,
 }
 
@@ -33,4 +33,5 @@ pub enum ConfigurationInput {
     Ready,
     NotReady,
     SetName(String),
+    PlayerId(String),
 }

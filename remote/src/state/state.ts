@@ -37,6 +37,7 @@ interface Register extends Request {
 interface Game {
   isChannelOpen: boolean;
   roomId: string | null;
+  playerId: string | null;
   channel: RTCDataChannel | null;
   sdpOffer: string | null;
   peerConnection: RTCPeerConnection;
@@ -80,6 +81,7 @@ export let state: State = {
   game: {
     isChannelOpen: false,
     roomId: null,
+    playerId: null,
     channel: null,
     sdpOffer: null,
     peerConnection: configuration.rtcPeerConnection,

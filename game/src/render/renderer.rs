@@ -113,28 +113,28 @@ fn render_before_game(assets: &mut Assets, data: SystemData, font: &Font, player
         canvas.copy(player_face, None, face_dest_rect).unwrap();
 
         // Render player name next to the circle
-        let texture_creator = canvas.texture_creator();
+        if !player.name.is_empty() {
+            let texture_creator = canvas.texture_creator();
+            let surface = font
+                .render(&player.name)
+                .blended(Color::RGBA(255, 0, 0, 255))
+                .map_err(|e| e.to_string())
+                .unwrap();
+            let texture = texture_creator
+                .create_texture_from_surface(&surface)
+                .map_err(|e| e.to_string())
+                .unwrap();
+            let font_rect = texture.query();
+            let name_pos = Point::new(560, y + 10);
 
-        let surface = font
-            .render(&player.name)
-            .blended(Color::RGBA(255, 0, 0, 255))
-            .map_err(|e| e.to_string())
-            .unwrap();
-        let texture = texture_creator
-            .create_texture_from_surface(&surface)
-            .map_err(|e| e.to_string())
-            .unwrap();
-        let font_rect = texture.query();
-        let name_pos = Point::new(560, y + 10);
-
-        canvas
-            .copy(
-                &texture,
-                None,
-                Rect::new(name_pos.x, name_pos.y, font_rect.width, font_rect.height),
-            )
-            .unwrap();
-
+            canvas
+                .copy(
+                    &texture,
+                    None,
+                    Rect::new(name_pos.x, name_pos.y, font_rect.width, font_rect.height),
+                )
+                .unwrap();
+        }
         // Increment the Y position for the next player
         y += 60;
     }

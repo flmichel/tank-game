@@ -1,6 +1,7 @@
 import { SdpOffer } from "../api/game";
 import { state } from "../state/state";
 import { Action, Reload, trigger } from "./actions";
+import { SignalUserId } from "./game-configuration";
 
 export class ConfigureGameChannel implements Action {
   gameRoomId: string;
@@ -63,6 +64,7 @@ export class ConnectToRoom implements Action {
     channel.onopen = () => {
       state.game.isChannelOpen = true;
       console.log("channel with room has opened");
+      trigger(new SignalUserId());
     };
     state.game.channel = channel;
   }

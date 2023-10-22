@@ -20,7 +20,7 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
 
     fn run(&mut self, (entities, player_inputs, mut players): Self::SystemData) {
         for (entity, input) in (&entities, &player_inputs).join() {
-            let player = self.retrieve_player(&mut players, input.player_id);
+            let player = self.retrieve_player_from_socket(&mut players, input.socket_id);
             println!("player inputs: {:?}", input);
 
             // Update the players next input
@@ -28,17 +28,18 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
                 // Perform action if `option_value` is `Some`
                 player.next_input = input.remote_input.clone();
             } else {
-                // If the input is SetName we create a new player if it doesn't exist
-                if let RemoteInput::ConfigurationInput(ConfigurationInput::SetName(name)) =
+                if let RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(id)) =
                     &input.remote_input
                 {
-                    let player_entity = entities.create();
-                    players
-                        .insert(
-                            player_entity,
-                            Player::new(input.player_id, name.to_string()),
-                        )
-                        .unwrap();
+                    let player = self.retrieve_player_from_id(&mut players, id);
+                    if let Some(player) = player {
+                        player.socket_id = input.socket_id;
+                    } else {
+                        let player_entity = entities.create();
+                        players
+                            .insert(player_entity, Player::new(input.socket_id, id.to_string()))
+                            .unwrap();
+                    }
                 } else {
                     println!("No player found");
                     // TODO Log this case correctly
@@ -51,13 +52,26 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
 }
 
 impl RetrievePlayerForInputs {
-    fn retrieve_player<'a>(
+    fn retrieve_player_from_socket<'a>(
         &self,
         players: &'a mut WriteStorage<Player>,
-        player_id: u32,
+        socket_id: u32,
     ) -> Option<&'a mut Player> {
         for player in players.join() {
-            if player.id == player_id {
+            if player.socket_id == socket_id {
+                return Some(player);
+            }
+        }
+        None
+    }
+
+    fn retrieve_player_from_id<'a>(
+        &self,
+        players: &'a mut WriteStorage<Player>,
+        player_id: &String,
+    ) -> Option<&'a mut Player> {
+        for player in players.join() {
+            if &player.id == player_id {
                 return Some(player);
             }
         }
@@ -122,7 +136,8 @@ impl HandleInputs {
                         player.name = name.to_string();
                     }
                 }
-                RemoteInput::NoInput => {
+                RemoteInput::NoInput
+                | RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(_)) => {
                     print!("nothing to do")
                 }
             }
@@ -212,7 +227,7 @@ impl HandleInputs {
                 match player.aim {
                     AimStatus::Aim(direction) => new_bullets.push(BulletData {
                         entity: entities.create(),
-                        bullet: Bullet::new(player.id),
+                        bullet: Bullet::new(player.id.clone()),
                         position: position.clone(),
                         movement: Movement::new_bullet_movement(direction),
                         circle: Circle::new_bullet_circle(),
@@ -252,15 +267,17 @@ fn get_position_block_center(block: Block) -> Position {
 }
 
 fn has_wall_collision(position: &Position, circle: &Circle, map: &Map) -> bool {
-    let top_block = &Block(position.x as u8, (position.y - circle.get_radius()) as u8);
-    let bottom_block = &Block(position.x as u8, (position.y + circle.get_radius()) as u8);
-    let right_block = &Block((position.x + circle.get_radius()) as u8, position.y as u8);
-    let left_block = &Block((position.x - circle.get_radius()) as u8, position.y as u8);
+    for hit_point in circle.hit_points.iter() {
+        let block = &Block(
+            (position.x + hit_point.x) as u8,
+            (position.y + hit_point.y) as u8,
+        );
+        if map.is_wall(block) {
+            return true;
+        }
+    }
 
-    map.is_wall(left_block)
-        || map.is_wall(right_block)
-        || map.is_wall(top_block)
-        || map.is_wall(bottom_block)
+    false
 }
 
 struct BulletData {
