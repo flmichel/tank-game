@@ -176,9 +176,18 @@ fn render_game(
         } else {
             texture = missile;
         }
-        canvas.copy(texture, None, face_dest_rect).unwrap();
 
+        let mut alive_player = false;
         if let Some(player) = player {
+            alive_player = player.is_alive;
+        }
+
+        if alive_player || player.is_none() {
+            canvas.copy(texture, None, face_dest_rect).unwrap();
+        }
+
+        if alive_player {
+            let player = player.unwrap();
             // Render player name next to the circle
             let texture_creator = canvas.texture_creator();
 

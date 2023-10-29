@@ -1,6 +1,5 @@
 use std::f32::consts::PI;
 
-use sdl2::rect::Point;
 use specs::{Component, VecStorage};
 use specs_derive::Component;
 
@@ -125,6 +124,7 @@ pub struct Player {
     pub aim: AimStatus,
     pub shoot: ShootStatus,
     pub next_input: RemoteInput,
+    pub is_alive: bool,
 }
 
 #[derive(PartialEq)]
@@ -150,6 +150,7 @@ impl Player {
             aim: AimStatus::None,
             shoot: ShootStatus::CanShoot,
             next_input: RemoteInput::NoInput,
+            is_alive: true,
         }
     }
 
@@ -172,7 +173,7 @@ pub enum ReadyStatus {
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Bullet {
-    owner_id: String,
+    pub owner_id: String,
 }
 
 impl Bullet {

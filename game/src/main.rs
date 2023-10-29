@@ -3,6 +3,7 @@ use game::components::{Bullet, Circle, Movement, Player, Position};
 use game::game::{MessageToGame, RoomId};
 use game::remotes::PlayerInput;
 use game::render::renderer::SystemData;
+use game::startup::setup_logger;
 use game::state::game_state::{Assets, Phase, State};
 use game::state::Map;
 use game::systems::{HandleInputs, RetrievePlayerForInputs};
@@ -20,14 +21,23 @@ use sdl2::ttf::{Font, Sdl2TtfContext};
 use sdl2::video::{Window, WindowContext};
 use server_communicator::ServerCommunicator;
 use specs::{Builder, Dispatcher, DispatcherBuilder, World, WorldExt};
+use std::env;
 use std::time::Duration;
 use tokio::spawn;
+use tracing::debug;
 
 #[derive(Debug, Clone, Copy)]
 struct Direction(f64);
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 {
+        setup_logger(&args[1]);
+    } else {
+        setup_logger("info");
+    }
+
     let (sender_to_server, receiver_server) = unbounded();
     let (sender_to_player_connector, receiver_player_connector) = unbounded();
     let (sender_to_game, mut receiver_game) = unbounded();
@@ -83,10 +93,9 @@ async fn main() -> Result<(), String> {
         if let Ok(Some(message)) = receiver_game.try_next() {
             match message {
                 MessageToGame::RoomId(id) => {
-                    println!("got id from server: {}", id.0);
+                    debug!("Received room id \"{}\" from server.", id.0);
                     let mut game_state = world.write_resource::<State>();
                     game_state.room_code = RoomCode::new(
-                        //format!("http://tank-game.flmichel.duckdns.org/?room-id={}", id.0).to_owned(),
                         format!("http://192.168.0.108:8080/?room-id={}", id.0).to_owned(),
                     );
                 }

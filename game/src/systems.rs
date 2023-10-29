@@ -1,4 +1,5 @@
 use specs::{Entities, Entity, Join, ReadStorage, System, WriteExpect, WriteStorage};
+use tracing::{debug, error, trace, warn};
 
 use crate::{
     components::{AimStatus, Bullet, Circle, Movement, Player, Position, ReadyStatus, ShootStatus},
@@ -21,7 +22,7 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
     fn run(&mut self, (entities, player_inputs, mut players): Self::SystemData) {
         for (entity, input) in (&entities, &player_inputs).join() {
             let player = self.retrieve_player_from_socket(&mut players, input.socket_id);
-            println!("player inputs: {:?}", input);
+            trace!("Player inputs: {:?}", input);
 
             // Update the players next input
             if let Some(player) = player {
@@ -41,8 +42,7 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
                             .unwrap();
                     }
                 } else {
-                    println!("No player found");
-                    // TODO Log this case correctly
+                    warn!("Player with with socket id \"{}\"", input.socket_id);
                 }
             }
             // delete the entity
@@ -123,7 +123,7 @@ impl HandleInputs {
         for mut player in (&mut players).join() {
             match &player.next_input {
                 RemoteInput::GameInput(_) => {
-                    println!("game input is not allowded: Game hasn't started yet")
+                    debug!("Game input is not allowed: Game hasn't started yet.")
                 }
                 RemoteInput::ConfigurationInput(ConfigurationInput::NotReady) => {
                     player.status = ReadyStatus::NotReady;
@@ -137,9 +137,7 @@ impl HandleInputs {
                     }
                 }
                 RemoteInput::NoInput
-                | RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(_)) => {
-                    print!("nothing to do")
-                }
+                | RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(_)) => {}
             }
         }
 
@@ -149,7 +147,7 @@ impl HandleInputs {
             for (player_entity, _) in (&entities, &players).join() {
                 let spawn = state.map.get_spawn_block();
                 match spawn {
-                    Err(err) => print!("Couldn't spawn player: {}", err),
+                    Err(err) => error!("Couldn't spawn player: {}.", err),
                     Ok(spawn) => {
                         let spawn_position = get_position_block_center(spawn);
 
@@ -184,14 +182,14 @@ impl HandleInputs {
                 }
                 RemoteInput::GameInput(GameInput::Shoot) => {
                     if player.shoot == ShootStatus::CanShoot {
-                        println!("Player is gonna shoot");
+                        trace!("Player is gonna shoot");
                         player.shoot = ShootStatus::Shooting;
                     } else {
                         player.aim = AimStatus::None;
                     }
                 }
                 RemoteInput::ConfigurationInput(_) => {
-                    println!("configuration input not allowed: game has started")
+                    trace!("configuration input not allowed: game has started")
                 }
                 RemoteInput::NoInput => {}
             }
@@ -220,6 +218,23 @@ impl HandleInputs {
             }
         }
 
+        // Bullet - Player collision
+        for (player_circle, player_position, player) in (&circles, &positions, &mut players).join()
+        {
+            for (bullet_circle, bullet_position, bullet) in (&circles, &positions, &bullets).join()
+            {
+                if has_bullet_player_collision(
+                    player_position,
+                    player_circle,
+                    bullet_position,
+                    bullet_circle,
+                ) && bullet.owner_id != player.id
+                {
+                    player.is_alive = false;
+                }
+            }
+        }
+
         // Generate new bullets
         let mut new_bullets = vec![];
         for (player, position) in (&mut players, &positions).join() {
@@ -233,7 +248,7 @@ impl HandleInputs {
                         circle: Circle::new_bullet_circle(),
                     }),
                     AimStatus::None => {
-                        println!("player must be aiming when shooting")
+                        trace!("player must be aiming when shooting")
                     }
                 }
                 player.update_after_shot();
@@ -278,6 +293,18 @@ fn has_wall_collision(position: &Position, circle: &Circle, map: &Map) -> bool {
     }
 
     false
+}
+
+fn has_bullet_player_collision(
+    player_position: &Position,
+    player_circle: &Circle,
+    bullet_position: &Position,
+    bullet_circle: &Circle,
+) -> bool {
+    let distance = ((player_position.x - bullet_position.x).powi(2)
+        + (player_position.y - bullet_position.y).powi(2))
+    .sqrt();
+    distance < player_circle.get_radius() + bullet_circle.get_radius()
 }
 
 struct BulletData {

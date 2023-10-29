@@ -2,6 +2,7 @@ use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures_util::{future, pin_mut, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tracing::debug;
 
 use crate::game::{MessageToGame, RoomId};
 
@@ -48,12 +49,12 @@ impl ServerCommunicator {
     pub async fn start(self, receiver: UnboundedReceiver<MessageToServer>) {
         let (ws_stream, _) = connect_async(&self.url).await.expect("Failed to connect");
 
-        println!("WebSocket handshake has been successfully completed");
+        debug!("WebSocket handshake has been successfully completed.");
 
         let (write, read) = ws_stream.split();
 
         let handle_server_messages = read.for_each(|message| async {
-            print!("receive message from server: {:?}", message);
+            debug!("Received message from server: {:?}.", message);
             let message = message.unwrap();
             let message: ServerMessage = serde_json::from_str(&message.to_text().unwrap()).unwrap();
             match message {
@@ -72,7 +73,7 @@ impl ServerCommunicator {
 
         let handle_answer = receiver
             .map(|answer| {
-                println!("answer received by server_communicator");
+                debug!("Received answer from server_communicator.");
                 Ok(Message::text(serde_json::to_string(&answer).unwrap()))
             })
             .forward(write);

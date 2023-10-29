@@ -1,6 +1,7 @@
 use qrcode::QrCode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use tracing::info;
 
 pub struct RoomCode {
     qr_code: QrCode,
@@ -8,6 +9,7 @@ pub struct RoomCode {
 
 impl RoomCode {
     pub fn new(room_id: String) -> Self {
+        info!("URL from QRCode is \"{room_id}\".");
         RoomCode {
             qr_code: QrCode::new(room_id.as_bytes()).unwrap(),
         }

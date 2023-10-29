@@ -1,5 +1,6 @@
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use std::sync::Arc;
+use tracing::{debug, trace};
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors,
@@ -50,10 +51,12 @@ impl WebRTCUtil {
 
         peer_connection.on_peer_connection_state_change(Box::new(
             move |s: RTCPeerConnectionState| {
-                println!("Peer Connection State has changed: {s}");
+                debug!("Peer Connection State with socketId \"{socket_id}\" has changed: {s}.");
 
                 if s == RTCPeerConnectionState::Failed {
-                    println!("Peer Connection has gone to failed exiting");
+                    debug!(
+                        "Peer Connection with socketId \"{socket_id}\" has gone to failed exiting."
+                    );
                 }
 
                 Box::pin(async {})
@@ -63,7 +66,7 @@ impl WebRTCUtil {
         peer_connection.on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
             let d_label = d.label().to_owned();
             let d_id = d.id();
-            println!("New DataChannel {d_label} {d_id}");
+            debug!("New DataChannel {d_label} {d_id} with socket id \"{socket_id}\".");
 
             let sender_to_game = sender_to_game.clone();
             // Register channel opening handling
@@ -71,7 +74,7 @@ impl WebRTCUtil {
                 // Register text message handling
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
-                    println!("Message from DataChannel '{d_label}' {socket_id}: '{msg_str}'");
+                    trace!("Message from DataChannel '{d_label}' {socket_id}: '{msg_str}'");
                     let remote_input: RemoteInput = serde_json::from_str(&msg_str).unwrap();
 
                     sender_to_game
@@ -173,7 +176,7 @@ impl PlayersConnector {
         let mut next_player_socket_id: u32 = 0;
         loop {
             if let Ok(Some(offer)) = self.receiver.try_next() {
-                println!("got an offer in players_connector");
+                debug!("Received an offer in players_connector.");
                 let peer_connection = self
                     .webrtc_util
                     .start_peer_connection(
@@ -184,16 +187,16 @@ impl PlayersConnector {
                     .await;
                 next_player_socket_id += 1;
                 let answer = self.webrtc_util.create_answer(&peer_connection).await;
-                println!("got an answer in players_connector");
+                debug!("Received an answer in players_connector.");
                 let answer = MessageToServer::SdpAnswer(SdpMessage {
                     data: encode(&answer),
                     id: offer.id,
                 });
 
-                println!("try to send the answer back to the server_communicator");
+                debug!("Try to send the answer back to the server_communicator.");
                 match self.sender_to_server.unbounded_send(answer) {
-                    Ok(()) => println!("The message was successfully sent"),
-                    Err(err) => println!("failed to send message {}", err.to_string()),
+                    Ok(()) => debug!("The message was successfully sent."),
+                    Err(err) => debug!("failed to send message {}", err.to_string()),
                 }
             }
         }
