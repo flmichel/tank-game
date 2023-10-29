@@ -3,8 +3,8 @@ import { customElement, property } from "lit/decorators.js";
 import { CanvasData, ControllerId } from "../../actions/remote";
 import { DisplayState } from "../../state/displayState";
 
-@customElement("remote-canvas")
-export class CanvasTouch extends LitElement {
+@customElement("game-remove")
+export class GameRemote extends LitElement {
   static get styles() {
     return css`
       #remote {

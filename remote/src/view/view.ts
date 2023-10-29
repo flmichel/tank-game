@@ -23,20 +23,10 @@ export class View extends LitElement {
   }
 
   render() {
-    return html` <div>
-      <nav-bar .state=${this.state}></nav-bar>
-      ${this.renderPage(this.state.route)}
-    </div>`;
-  }
-
-  renderPage(route: string) {
-    console.log("rerendering page (root view)", this.state.gameState.isReady);
-    switch (route) {
-      case "/":
-        return html`
-          <home-page></home-page>
-          <game-view .state=${this.state}></game-view>
-        `;
+    if (this.state.isInRoom) {
+      return html`<game-view .state=${this.state}></game-view>`;
+    } else {
+      return html` <home-page .state=${this.state}></home-page> `;
     }
   }
 }

@@ -3,7 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { GamePhase, State } from "../state/state";
 import "./navbar";
 import "./pages/homepage";
-import "./pages/remote";
+import "./pages/game-remote";
 import "./pages/game-configuration";
 import { DisplayState } from "../state/displayState";
 
@@ -16,13 +16,14 @@ export class View extends LitElement {
     switch (this.state.gameState.phase) {
       case GamePhase.BeforeNextGame:
         return html`
+          <nav-bar></nav-bar>
           <game-configuration
             .state=${this.state.gameState}
           ></game-configuration>
         `;
       case GamePhase.InGame:
         console.log("InGame phase updated");
-        return html` <remote-canvas .state=${this.state}></remote-canvas> `;
+        return html` <game-remote .state=${this.state}></game-remote> `;
       default:
         return html` <p>this is not normal</p> `;
     }

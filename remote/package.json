@@ -21,6 +21,6 @@
     "webpack-dev-server": "^4.13.3"
   },
   "dependencies": {
-    "lit": "^2.7.4"
+    "lit": "^3.0.1"
   }
 }

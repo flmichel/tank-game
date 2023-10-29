@@ -1,6 +1,7 @@
 import { sendStringToGame, sendToGame } from "../api/game";
 import { GamePhase, state } from "../state/state";
 import { Action } from "./actions";
+import { ConfigureGameChannel } from "./webrtc";
 
 export class UpdatePlayerName implements Action {
   playerName: string;
@@ -51,4 +52,16 @@ function generateRandomId(): string {
     .replace(/=/g, "");
 
   return base64;
+}
+
+export class EnterGame implements Action {
+  roomId: string;
+
+  constructor(roomId: string) {
+    this.roomId = roomId;
+  }
+
+  execute(): void {
+    new ConfigureGameChannel(this.roomId).execute();
+  }
 }

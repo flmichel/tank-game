@@ -1,23 +1,39 @@
 import { html, css, LitElement } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { trigger, Route } from "../actions/actions";
-import { DisplayState } from "../state/displayState";
+import { StyledElement } from "./style/styled-element";
 
 @customElement("nav-bar")
 export class Navbar extends LitElement {
-  static styles = css`
-    li {
-      color: blue;
-    }
-  `;
+  static styles = [
+    StyledElement.styles,
+    css`
+      ul {
+        list-style: none;
+        display: flex;
+        background-color: #000000;
+        justify-content: center;
+        align-items: center;
+      }
 
-  @property({ type: Object, reflect: true })
-  state!: DisplayState;
+      li {
+        margin: 0;
+        padding: 10px;
+      }
+
+      li img {
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+      }
+    `,
+  ];
 
   render() {
     return html`
       <ul>
-        <li><button @click=${() => trigger(new Route("/"))}>Home</button></li>
+        <li><img src="emoji-icon.png" @click=${() =>
+          trigger(new Route("/"))}></button></li>
 
         <li>
           <button @click=${() => trigger(new Route("/login"))}>Login</button>
