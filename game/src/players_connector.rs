@@ -1,27 +1,25 @@
-use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use anyhow::Result;
+use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use tokio::spawn;
 use std::sync::Arc;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace, warn};
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors,
         media_engine::{MediaEngine, MIME_TYPE_OPUS},
         APIBuilder, API,
     },
-    data_channel::{data_channel_message::DataChannelMessage, RTCDataChannel},
+    data_channel::{data_channel_init::RTCDataChannelInit, data_channel_message::DataChannelMessage, RTCDataChannel},
     ice_transport::ice_server::RTCIceServer,
     interceptor::registry::Registry,
     peer_connection::{
-        configuration::RTCConfiguration, peer_connection_state::RTCPeerConnectionState,
-        sdp::session_description::RTCSessionDescription, RTCPeerConnection,
+        configuration::RTCConfiguration, math_rand_alpha, peer_connection_state::RTCPeerConnectionState, sdp::session_description::RTCSessionDescription, RTCPeerConnection
     },
     rtp_transceiver::rtp_codec::{RTCRtpCodecCapability, RTCRtpCodecParameters, RTPCodecType},
 };
 
 use crate::{
-    game::MessageToGame,
-    remotes::{PlayerInput, RemoteInput},
-    server_communicator::{MessageToServer, SdpMessage},
-    signal::{decode, encode},
+    error::{Error, ErrorKind}, game::{MessageToGame, SynchronizePlayer}, remotes::{ConfigurationInput, PlayerInput, RemoteInput}, server_communicator::{MessageToServer, SdpMessage}, signal::{decode, encode}
 };
 
 pub struct PlayersConnector {
@@ -69,20 +67,76 @@ impl WebRTCUtil {
             debug!("New DataChannel {d_label} {d_id} with socket id \"{socket_id}\".");
 
             let sender_to_game = sender_to_game.clone();
+            let (sender_to_remote, mut receiver_remote) = unbounded();
+
             // Register channel opening handling
             Box::pin(async move {
+                let d2 = Arc::clone(&d);
+                let d3 = Arc::clone(&d);
+                let d_label2 = d_label.clone();
+                let d_label3 = d_label.clone();
+                let d_id2 = d_id;
+
+                d.on_open(Box::new(move || {
+                    println!("Data channel '{d_label2}'-'{d_id2}' open. Random messages will now be sent to any connected DataChannels every 5 seconds");
+                    
+                    Box::pin(async move {
+                        spawn(async move { loop {
+                            if let Ok(Some(message_to_remote)) = receiver_remote.try_next() {
+                                match serde_json::to_string(&message_to_remote) {
+                                    Ok(message) => {
+                                        warn!("Sending Message to remote from DataChannel {socket_id}: '{message}'");
+                                        warn!("Sending '{message}' in channel '{d_label2}'-'{d_id2}'");
+                                        let result: Result::<usize> = d2.send_text("hello").await.map_err(Into::into);
+                                        match result {
+                                            Ok(_) => {warn!("sent successfully")}
+                                            Err(err) => {
+                                                error!("error sending a message to a remote: {err}");
+                                            }
+                                        }
+                                        warn!("message has finished sending the message")
+                                    }
+                                    Err(_) => {
+                                        error!("error parsing a message to a remote");
+                                    }
+                                }
+                            }
+                        };});
+
+                        /*let mut result = Result::<usize>::Ok(0);
+                        while result.is_ok() {
+                            let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(5));
+                            tokio::pin!(timeout);
+
+                            tokio::select! {
+                                _ = timeout.as_mut() =>{
+                                    let message = math_rand_alpha(15);
+                                    println!("Sending '{message}' in channel '{d_label3}'-'{d_id2}'");
+                                    result = d3.send_text(message).await.map_err(Into::into);
+                                }
+                            };
+                        }*/
+                    })
+                }));
+
                 // Register text message handling
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
                     trace!("Message from DataChannel '{d_label}' {socket_id}: '{msg_str}'");
                     let remote_input: RemoteInput = serde_json::from_str(&msg_str).unwrap();
 
-                    sender_to_game
+                    if let RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(player_id)) = remote_input {
+                        let sender_to_remote = sender_to_remote.clone();
+                        let data_channel = Arc::clone(&d3);
+                        sender_to_game.unbounded_send(MessageToGame::SynchronizePlayer(SynchronizePlayer { socket_id, player_id, sender_to_remote, data_channel})).unwrap();
+                    } else {
+                        sender_to_game
                         .unbounded_send(MessageToGame::PlayerInput(PlayerInput {
                             socket_id,
                             remote_input,
                         }))
                         .unwrap();
+                    }
                     Box::pin(async {})
                 }));
             })

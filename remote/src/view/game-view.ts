@@ -24,8 +24,6 @@ export class View extends LitElement {
       case GamePhase.InGame:
         console.log("InGame phase updated");
         return html` <game-remote .state=${this.state}></game-remote> `;
-      default:
-        return html` <p>this is not normal</p> `;
     }
   }
 }

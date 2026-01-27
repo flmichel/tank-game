@@ -24,9 +24,9 @@ export class ToggleReady implements Action {
     sendStringToGame(messageToGame);
 
     // Since the game cannot send message back yet we consider that the game starts when this player is ready
-    if (isReady) {
+    /*if (isReady) {
       state.game.state.phase = GamePhase.InGame;
-    }
+    }*/
   }
 }
 
@@ -64,4 +64,25 @@ export class EnterGame implements Action {
   execute(): void {
     new ConfigureGameChannel(this.roomId).execute();
   }
+}
+
+export enum GameMessage {
+  GameOver,
+  GameStart,
+  PlayerDied,
+}
+
+export class HandleGameMessage implements Action {
+  message: GameMessage;
+
+  constructor(message: GameMessage) {
+    this.message = message;
+  }
+
+  execute(): void {
+    if (this.message == GameMessage.GameOver) {
+      state.game.state.phase = GamePhase.BeforeNextGame;
+    }
+  }
+  
 }

@@ -4,7 +4,7 @@ import { Authentication } from "../../state/state";
 import { DisplayState } from "../../state/displayState";
 import { StyledElement } from "../style/styled-element";
 import { trigger } from "../../actions/actions";
-import { EnterGame } from "../../actions/game-configuration";
+import { EnterGame } from "../../actions/game";
 
 @customElement("home-page")
 export class HomePage extends LitElement {

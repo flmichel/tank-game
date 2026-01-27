@@ -1,9 +1,10 @@
 use std::f32::consts::PI;
 
+use futures_channel::mpsc::UnboundedSender;
 use specs::{Component, VecStorage};
 use specs_derive::Component;
 
-use crate::{remotes::RemoteInput, render::renderer};
+use crate::{game::MessageToRemote, remotes::RemoteInput, render::renderer};
 
 const PLAYER_BLOCKS_PER_SECOND: f64 = 0.5;
 const BULLET_BLOCKS_PER_SECOND: f64 = 1.;
@@ -119,12 +120,14 @@ impl Circle {
 pub struct Player {
     pub socket_id: u32,
     pub id: String,
+    pub sender_to_remote: UnboundedSender<MessageToRemote>,
     pub name: String,
     pub status: ReadyStatus,
     pub aim: AimStatus,
     pub shoot: ShootStatus,
     pub next_input: RemoteInput,
     pub is_alive: bool,
+    pub is_winner: bool,
 }
 
 #[derive(PartialEq)]
@@ -141,16 +144,18 @@ pub enum ShootStatus {
 }
 
 impl Player {
-    pub fn new(socket_id: u32, id: String) -> Player {
+    pub fn new(socket_id: u32, id: String, sender_to_remote: UnboundedSender<MessageToRemote>) -> Player {
         Player {
             socket_id,
             id,
+            sender_to_remote,
             name: String::new(),
             status: ReadyStatus::NotReady,
             aim: AimStatus::None,
             shoot: ShootStatus::CanShoot,
             next_input: RemoteInput::NoInput,
             is_alive: true,
+            is_winner: false,
         }
     }
 

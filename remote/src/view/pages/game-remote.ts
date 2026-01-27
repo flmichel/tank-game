@@ -3,7 +3,7 @@ import { customElement, property } from "lit/decorators.js";
 import { CanvasData, ControllerId } from "../../actions/remote";
 import { DisplayState } from "../../state/displayState";
 
-@customElement("game-remove")
+@customElement("game-remote")
 export class GameRemote extends LitElement {
   static get styles() {
     return css`

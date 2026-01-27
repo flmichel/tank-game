@@ -1,12 +1,12 @@
 use futures_channel::mpsc::unbounded;
 use game::components::{Bullet, Circle, Movement, Player, Position};
-use game::game::{MessageToGame, RoomId};
+use game::game::{MessageToGame, RoomId, SynchronizePlayer};
 use game::remotes::PlayerInput;
 use game::render::renderer::SystemData;
 use game::startup::setup_logger;
 use game::state::game_state::{Assets, Phase, State};
 use game::state::Map;
-use game::systems::{HandleInputs, RetrievePlayerForInputs};
+use game::systems::{HandleInputs, RetrievePlayerForInputs, SynchronizePlayerToRemote};
 use game::{players_connector, render::renderer, room_code, server_communicator};
 use players_connector::PlayersConnector;
 use sdl2::event::Event;
@@ -52,7 +52,8 @@ async fn main() -> Result<(), String> {
     let server_communicator = ServerCommunicator::new(
         sender_to_game,
         sender_to_player_connector,
-        "ws://tank-game.flmichel.duckdns.org/ws",
+        //"ws://tank-game.flmichel.duckdns.org/ws",
+        "ws://0.0.0.0:5000/ws",
     );
     spawn(async move { server_communicator.start(receiver_server).await });
 
@@ -79,8 +80,7 @@ async fn main() -> Result<(), String> {
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
+                Event::Quit { .. } | Event::KeyDown {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => {
@@ -96,11 +96,14 @@ async fn main() -> Result<(), String> {
                     debug!("Received room id \"{}\" from server.", id.0);
                     let mut game_state = world.write_resource::<State>();
                     game_state.room_code = RoomCode::new(
-                        format!("http://192.168.0.108:8080/?room-id={}", id.0).to_owned(),
+                        format!("http://192.168.178.24:8080/?room-id={}", id.0).to_owned(),
                     );
                 }
                 MessageToGame::PlayerInput(player_input) => {
                     world.create_entity().with(player_input).build();
+                },
+                MessageToGame::SynchronizePlayer(sender_to_remote) => {
+                    world.create_entity().with(sender_to_remote).build();
                 }
             }
         }
@@ -131,6 +134,7 @@ fn create_world(window: &Window) -> World {
     let mut world = World::new();
     world.register::<RoomId>();
     world.register::<PlayerInput>();
+    world.register::<SynchronizePlayer>();
     world.register::<Position>();
     world.register::<Movement>();
     world.register::<Circle>();
@@ -153,6 +157,7 @@ fn create_dispatcher() -> Dispatcher<'static, 'static> {
     let dispatcher = DispatcherBuilder::new()
         .with(RetrievePlayerForInputs, "RetrievePlayerForInputs", &[])
         .with(HandleInputs, "HandleInputs", &["RetrievePlayerForInputs"])
+        .with( SynchronizePlayerToRemote, "SynchronizePlayerToRemote", &["RetrievePlayerForInputs"])
         .build();
 
     dispatcher

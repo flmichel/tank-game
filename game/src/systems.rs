@@ -1,13 +1,13 @@
 use specs::{Entities, Entity, Join, ReadStorage, System, WriteExpect, WriteStorage};
+use tokio::spawn;
 use tracing::{debug, error, trace, warn};
+use std::sync::Arc;
 
 use crate::{
-    components::{AimStatus, Bullet, Circle, Movement, Player, Position, ReadyStatus, ShootStatus},
-    remotes::{ConfigurationInput, GameInput, PlayerInput, RemoteInput},
-    state::{
+    components::{AimStatus, Bullet, Circle, Movement, Player, Position, ReadyStatus, ShootStatus}, game::{MessageToRemote, SynchronizePlayer}, remotes::{ConfigurationInput, GameInput, PlayerInput, RemoteInput}, state::{
         game_state::{Phase, State},
         Block, Map,
-    },
+    }
 };
 
 pub struct RetrievePlayerForInputs;
@@ -29,21 +29,7 @@ impl<'a> System<'a> for RetrievePlayerForInputs {
                 // Perform action if `option_value` is `Some`
                 player.next_input = input.remote_input.clone();
             } else {
-                if let RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(id)) =
-                    &input.remote_input
-                {
-                    let player = self.retrieve_player_from_id(&mut players, id);
-                    if let Some(player) = player {
-                        player.socket_id = input.socket_id;
-                    } else {
-                        let player_entity = entities.create();
-                        players
-                            .insert(player_entity, Player::new(input.socket_id, id.to_string()))
-                            .unwrap();
-                    }
-                } else {
-                    warn!("Player with with socket id \"{}\"", input.socket_id);
-                }
+                warn!("No player found with socket id \"{}\"", input.socket_id);
             }
             // delete the entity
             entities.delete(entity).expect("Failed to delete entity");
@@ -59,19 +45,6 @@ impl RetrievePlayerForInputs {
     ) -> Option<&'a mut Player> {
         for player in players.join() {
             if player.socket_id == socket_id {
-                return Some(player);
-            }
-        }
-        None
-    }
-
-    fn retrieve_player_from_id<'a>(
-        &self,
-        players: &'a mut WriteStorage<Player>,
-        player_id: &String,
-    ) -> Option<&'a mut Player> {
-        for player in players.join() {
-            if &player.id == player_id {
                 return Some(player);
             }
         }
@@ -120,7 +93,7 @@ impl HandleInputs {
         mut circles: WriteStorage<'a, Circle>,
         mut state: WriteExpect<'a, State>,
     ) {
-        for mut player in (&mut players).join() {
+        for player in (&mut players).join() {
             match &player.next_input {
                 RemoteInput::GameInput(_) => {
                     debug!("Game input is not allowed: Game hasn't started yet.")
@@ -141,10 +114,14 @@ impl HandleInputs {
             }
         }
 
-        if self.all_players_are_ready(&players) {
+        if self.can_game_start(&players) {
             state.phase = Phase::InGame;
 
-            for (player_entity, _) in (&entities, &players).join() {
+            for (player_entity, player) in (&entities, &mut players).join() {
+                player.status = ReadyStatus::NotReady;
+                if let Err(e) = player.sender_to_remote.unbounded_send(MessageToRemote::GameStart) {
+                    error!("Failed to send GameStart message: {:?}", e);
+                }
                 let spawn = state.map.get_spawn_block();
                 match spawn {
                     Err(err) => error!("Couldn't spawn player: {}.", err),
@@ -160,6 +137,10 @@ impl HandleInputs {
                 }
             }
         }
+    }
+
+    fn can_game_start(&self, players: &WriteStorage<Player>) -> bool {
+        players.join().count() > 1 && self.all_players_are_ready(players)
     }
 
     fn all_players_are_ready(&self, players: &WriteStorage<Player>) -> bool {
@@ -208,7 +189,7 @@ impl HandleInputs {
         mut circles: WriteStorage<'a, Circle>,
         mut movements: WriteStorage<'a, Movement>,
         mut positions: WriteStorage<'a, Position>,
-        state: WriteExpect<'a, State>,
+        mut state: WriteExpect<'a, State>,
     ) {
         // Wall detection
         for (circle, movement, position) in (&mut circles, &mut movements, &mut positions).join() {
@@ -233,6 +214,27 @@ impl HandleInputs {
                     player.is_alive = false;
                 }
             }
+        }
+
+        // End the game if one player is alive
+        let mut alive_players_count = 0;
+        let mut winner: Option<&mut Player> = None;
+        (&mut players).join().for_each(|player| {
+            if player.is_alive {
+                alive_players_count += 1;
+                player.is_winner = true;
+                winner = Some(player);
+
+                if alive_players_count > 1 {
+                    winner = None;
+                    return;
+                }
+            }
+        });
+
+        if let Some(player) = winner {
+            player.is_winner = true;
+            state.phase = Phase::BeforeNextGame;
         }
 
         // Generate new bullets
@@ -313,4 +315,54 @@ struct BulletData {
     position: Position,
     movement: Movement,
     circle: Circle,
+}
+
+pub struct SynchronizePlayerToRemote;
+
+impl<'a> System<'a> for SynchronizePlayerToRemote {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, SynchronizePlayer>,
+        WriteStorage<'a, Player>,
+    );
+
+    fn run(
+        &mut self,
+        (entities, synchronize_players, mut players): Self::SystemData,
+    ) {
+        for (entity, synchronize_player) in (&entities, &synchronize_players).join() {
+            if let Some(player) = retrieve_player_from_id(&mut players, &synchronize_player.player_id) {
+                player.socket_id = synchronize_player.socket_id;
+                player.sender_to_remote = synchronize_player.sender_to_remote.clone();
+            } else {
+                let player_entity = entities.create();
+                
+                players
+                    .insert(player_entity, Player::new(
+                        synchronize_player.socket_id,
+                        synchronize_player.player_id.clone(),
+                        synchronize_player.sender_to_remote.clone()))
+                    .unwrap();
+                warn!("sending message to remote");
+                let data_channel = Arc::clone(&synchronize_player.data_channel);
+                /*if let Err(e) = synchronize_player.sender_to_remote.unbounded_send(MessageToRemote::PlayerDied) {
+                    error!("Failed to send GameStart message: {:?}", e);
+                }*/
+            }
+            // delete the entity
+            entities.delete(entity).expect("Failed to delete entity");
+        }
+    }
+}
+
+fn retrieve_player_from_id<'a>(
+    players: &'a mut WriteStorage<Player>,
+    player_id: &String,
+) -> Option<&'a mut Player> {
+    for player in players.join() {
+        if &player.id == player_id {
+            return Some(player);
+        }
+    }
+    None
 }

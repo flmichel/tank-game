@@ -6,7 +6,7 @@ import { trigger } from "../../actions/actions";
 import {
   ToggleReady,
   UpdatePlayerName,
-} from "../../actions/game-configuration";
+} from "../../actions/game";
 
 @customElement("game-configuration")
 export class CanvasTouch extends LitElement {
