@@ -1,0 +1,3 @@
+[serve]
+# 8080 is the remote's dev server
+port = 8081

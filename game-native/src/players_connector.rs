@@ -1,7 +1,8 @@
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use game_core::{
-    remotes::{ConfigurationInput, PlayerInput, RemoteInput},
-    MessageToGame, SynchronizePlayer,
+    protocol::{MessageToServer, SdpMessage},
+    remotes::RemoteInput,
+    MessageToGame,
 };
 use std::sync::Arc;
 use tracing::{debug, trace};
@@ -20,9 +21,7 @@ use webrtc::{
     rtp_transceiver::rtp_codec::{RTCRtpCodecCapability, RTCRtpCodecParameters, RTPCodecType},
 };
 
-use crate::{
-    server_communicator::{MessageToServer, SdpMessage}, signal::{decode, encode}
-};
+use crate::signal::{decode, encode};
 
 /// A remote's data channel, handed to the main loop so it can deliver the game's outbox.
 pub type DataChannelRegistration = (u32, Arc<RTCDataChannel>);
@@ -91,16 +90,9 @@ impl WebRTCUtil {
                     trace!("Message from DataChannel '{d_label}' {socket_id}: '{msg_str}'");
                     let remote_input: RemoteInput = serde_json::from_str(&msg_str).unwrap();
 
-                    if let RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(player_id)) = remote_input {
-                        sender_to_game.unbounded_send(MessageToGame::SynchronizePlayer(SynchronizePlayer { socket_id, player_id })).unwrap();
-                    } else {
-                        sender_to_game
-                        .unbounded_send(MessageToGame::PlayerInput(PlayerInput {
-                            socket_id,
-                            remote_input,
-                        }))
+                    sender_to_game
+                        .unbounded_send(MessageToGame::from_remote(socket_id, remote_input))
                         .unwrap();
-                    }
                     Box::pin(async {})
                 }));
             })

@@ -1,31 +1,12 @@
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures_util::{future, pin_mut, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::debug;
 
-use game_core::{MessageToGame, RoomId};
-
-#[derive(Deserialize)]
-#[serde(rename_all = "kebab-case")]
-#[serde(untagged)]
-pub enum ServerMessage {
-    RoomId(String),
-    SdpOffer(SdpMessage),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "kebab-case")]
-pub struct SdpMessage {
-    pub id: u32,
-    pub data: String,
-}
-
-#[derive(Serialize, Debug)]
-#[serde(untagged)]
-pub enum MessageToServer {
-    SdpAnswer(SdpMessage),
-}
+use game_core::{
+    protocol::{MessageToServer, SdpMessage, ServerMessage},
+    MessageToGame, RoomId,
+};
 
 pub struct ServerCommunicator {
     sender_to_game: UnboundedSender<MessageToGame>,

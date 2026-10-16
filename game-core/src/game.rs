@@ -6,7 +6,7 @@ use tracing::debug;
 
 use crate::{
     components::{Bullet, Circle, Movement, Player, Position},
-    remotes::PlayerInput,
+    remotes::{ConfigurationInput, PlayerInput, RemoteInput},
     render::{self, Renderer},
     room_code::RoomCode,
     state::{
@@ -26,6 +26,18 @@ pub enum MessageToGame {
     PlayerInput(PlayerInput),
     RoomId(RoomId),
     SynchronizePlayer(SynchronizePlayer),
+}
+
+impl MessageToGame {
+    /// A remote first sends its player id (to keep its player across reconnects), then inputs.
+    pub fn from_remote(socket_id: u32, remote_input: RemoteInput) -> MessageToGame {
+        match remote_input {
+            RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(player_id)) => {
+                MessageToGame::SynchronizePlayer(SynchronizePlayer { socket_id, player_id })
+            }
+            remote_input => MessageToGame::PlayerInput(PlayerInput { socket_id, remote_input }),
+        }
+    }
 }
 
 #[derive(Component)]

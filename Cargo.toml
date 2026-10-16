@@ -3,4 +3,5 @@ members = [
     "./server",
     "./game-core",
     "./game-native",
+    "./game-web",
 ]

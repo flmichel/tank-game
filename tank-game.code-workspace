@@ -10,6 +10,9 @@
       "path": "game-native"
     },
     {
+      "path": "game-web"
+    },
+    {
       "path": "remote"
     },
     {
