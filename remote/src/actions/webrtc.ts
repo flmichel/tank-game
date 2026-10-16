@@ -2,7 +2,7 @@ import { SdpOffer } from "../api/game";
 import { state } from "../state/state";
 import { Action, Reload, trigger } from "./actions";
 import { GameMessage, HandleGameMessage, SignalUserId } from "./game";
-import { sendSticks } from "./remote";
+import { streamSticks } from "./remote";
 
 export class ConfigureGameChannel implements Action {
   gameRoomId: string;
@@ -33,15 +33,12 @@ export class ConfigureGameChannel implements Action {
     console.log("channel created");
 
     // Unreliable: the stick state, where a late state is worth less than the next one
-    let inputs = peerConnection.createDataChannel("inputs", {
-      ordered: false,
-      maxRetransmits: 0,
-    });
-    let timer = 0;
-    inputs.onopen = () => {
-      timer = window.setInterval(() => sendSticks(inputs), 1000 / 30);
-    };
-    inputs.onclose = () => clearInterval(timer);
+    streamSticks(
+      peerConnection.createDataChannel("inputs", {
+        ordered: false,
+        maxRetransmits: 0,
+      })
+    );
 
     peerConnection.onicecandidate = (event) => {
       console.log(

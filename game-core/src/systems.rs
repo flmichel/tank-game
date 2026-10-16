@@ -285,9 +285,9 @@ impl HandleInputs {
 
         // Update players
         for player in (&mut players).join() {
-            if let ShootStatus::FrameLeftUntilNextShot(number_of_frames) = player.shoot {
-                if number_of_frames > 0 {
-                    player.shoot = ShootStatus::FrameLeftUntilNextShot(number_of_frames - 1);
+            if let ShootStatus::StepsLeftUntilNextShot(steps) = player.shoot {
+                if steps > 0 {
+                    player.shoot = ShootStatus::StepsLeftUntilNextShot(steps - 1);
                 } else {
                     player.shoot = ShootStatus::CanShoot;
                 }

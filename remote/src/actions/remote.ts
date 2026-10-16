@@ -1,12 +1,36 @@
 import { sendToGame } from "../api/game";
 import { GamePhase, state } from "../state/state";
-import { Action, trigger } from "./actions";
+import { Action } from "./actions";
 
+let inputs: RTCDataChannel | null = null;
 let seq = 0;
 
-// Sent at 30 Hz during the game, touched or not: a lost state (even a release) is replaced by the next one
-export function sendSticks(inputs: RTCDataChannel) {
-  if (state.game.state.phase !== GamePhase.InGame) return;
+// The stick state goes out on every change, plus a 60 Hz resend: each message is the full state,
+// so a lost one (even a release) is replaced by the next within ~17 ms. Pings measure the network.
+export function streamSticks(channel: RTCDataChannel) {
+  let timers: number[] = [];
+  channel.onopen = () => {
+    inputs = channel;
+    timers = [
+      window.setInterval(sendSticks, 1000 / 60),
+      window.setInterval(() => channel.send(JSON.stringify({ ping: performance.now() })), 1000),
+    ];
+  };
+  channel.onclose = () => {
+    inputs = null;
+    timers.forEach(clearInterval);
+  };
+  channel.onmessage = (event) => {
+    const { pong } = JSON.parse(event.data);
+    const display = document.getElementById("ping");
+    if (typeof pong === "number" && display) {
+      display.textContent = `ping ${Math.round(performance.now() - pong)} ms`;
+    }
+  };
+}
+
+function sendSticks() {
+  if (inputs?.readyState !== "open" || state.game.state.phase !== GamePhase.InGame) return;
   const { leftController, rightController } = state.remote;
   inputs.send(
     JSON.stringify({
@@ -105,12 +129,15 @@ export class Point {
   }
 }
 
+// Chrome hands over pointer moves as soon as the screen samples them instead of once per frame
+// (secure contexts only); elsewhere this falls back to the frame-aligned pointermove.
+const POINTER_MOVE = "onpointerrawupdate" in window ? "pointerrawupdate" : "pointermove";
+
 export class CanvasData {
   controllerId: ControllerId;
   context: CanvasRenderingContext2D;
   canvas: HTMLCanvasElement;
-  isDrawing: boolean;
-  touchIdentifier: number | null = null;
+  pointerId: number | null = null;
   lastLocation: Point | null = null;
   lastCenter: Point | null = null;
   lastUpdateTime: number | null = null;
@@ -122,117 +149,77 @@ export class CanvasData {
     ) as HTMLCanvasElement;
     this.canvas = canvas;
     this.context = canvas.getContext("2d")!;
-    this.isDrawing = false;
 
-    canvas.addEventListener("touchstart", (event) => this.touchStart(event));
-
-    canvas.addEventListener("touchmove", (event) => this.touchMove(event));
-
-    canvas.addEventListener("touchend", (event) => this.touchEnd(event));
-  }
-
-  touchStart(event: TouchEvent) {
-    event.preventDefault();
-
-    let touch = event.touches[TouchIndex.next()];
-    this.touchIdentifier = touch.identifier;
-    console.log("start drawing touch", this.touchIdentifier, event.touches);
-
-    this.isDrawing = true;
-    this.lastCenter = new Point(
-      touch.clientX - this.canvas.offsetLeft,
-      touch.clientY - this.canvas.offsetTop
+    canvas.addEventListener("pointerdown", (event) => this.pointerDown(event));
+    canvas.addEventListener(POINTER_MOVE, (event) =>
+      this.pointerMove(event as PointerEvent)
     );
-    trigger(new SetControllerCenter(this.controllerId, this.lastCenter));
+    canvas.addEventListener("pointerup", (event) => this.pointerUp(event));
+    canvas.addEventListener("pointercancel", (event) => this.pointerUp(event));
   }
 
-  touchMove(event: TouchEvent) {
+  // Each stick follows one finger
+  pointerDown(event: PointerEvent) {
+    if (this.pointerId !== null) return;
     event.preventDefault();
-    if (this.isDrawing) {
-      let touch = this.retrieveTouch(event)!;
+    this.pointerId = event.pointerId;
+    this.canvas.setPointerCapture(event.pointerId);
+    this.lastCenter = this.locate(event);
+    new SetControllerCenter(this.controllerId, this.lastCenter).execute();
+  }
 
-      if (!this.lastLocation) {
-        this.lastLocation = new Point(
-          touch.clientX - this.canvas.offsetLeft,
-          touch.clientY - this.canvas.offsetTop
-        );
-      }
-
-      const currentX = touch.clientX - this.canvas.offsetLeft;
-      const currentY = touch.clientY - this.canvas.offsetTop;
-      const currentLocation = new Point(currentX, currentY);
-
-      // Every move updates the stick state that `sendSticks` streams; only re-centering is paced
-      trigger(new SetControllerDirection(this.controllerId, currentLocation));
-      let currentTime = new Date().getTime();
-      if (!this.lastUpdateTime || this.lastUpdateTime + 80 < currentTime) {
-        if (
-          this.lastLocation!.getDistanceFrom(this.lastCenter!) > 25 &&
-          this.controllerId == ControllerId.MOVEMENT
-        ) {
-          trigger(
-            new SetControllerCenter(this.controllerId, this.lastLocation!)
-          );
-          this.lastCenter = this.lastLocation;
-        }
-        this.lastUpdateTime = currentTime;
-      }
-
-      this.context.beginPath();
-      this.context.moveTo(this.lastLocation!.x, this.lastLocation!.y);
-      this.context.lineTo(currentX, currentY);
-      this.context.stroke();
+  pointerMove(event: PointerEvent) {
+    if (event.pointerId !== this.pointerId) return;
+    const currentLocation = this.locate(event);
+    if (!this.lastLocation) {
       this.lastLocation = currentLocation;
     }
+
+    // Steer towards where the finger is about to be (Chrome predicts about a frame ahead), and
+    // send before drawing anything. No view update: nothing on the page shows the stick state.
+    const predicted = event.getPredictedEvents?.() ?? [];
+    const target =
+      predicted.length > 0
+        ? this.locate(predicted[predicted.length - 1])
+        : currentLocation;
+    new SetControllerDirection(this.controllerId, target).execute();
+    sendSticks();
+
+    // The floating move stick re-centers on the finger, paced to keep its feel
+    const currentTime = performance.now();
+    if (!this.lastUpdateTime || this.lastUpdateTime + 80 < currentTime) {
+      if (
+        this.lastLocation.getDistanceFrom(this.lastCenter!) > 25 &&
+        this.controllerId == ControllerId.MOVEMENT
+      ) {
+        new SetControllerCenter(this.controllerId, this.lastLocation).execute();
+        this.lastCenter = this.lastLocation;
+      }
+      this.lastUpdateTime = currentTime;
+    }
+
+    this.context.beginPath();
+    this.context.moveTo(this.lastLocation.x, this.lastLocation.y);
+    this.context.lineTo(currentLocation.x, currentLocation.y);
+    this.context.stroke();
+    this.lastLocation = currentLocation;
   }
 
-  touchEnd(event: TouchEvent) {
-    event.preventDefault();
-    this.isDrawing = false;
-    console.log("touchEnd", this.lastLocation);
-    trigger(new StopController(this.controllerId, this.lastLocation));
-    TouchIndex.updateIndex(event);
+  pointerUp(event: PointerEvent) {
+    if (event.pointerId !== this.pointerId) return;
+    this.pointerId = null;
+    new StopController(this.controllerId, this.lastLocation).execute();
+    sendSticks();
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.lastLocation = null;
     this.lastCenter = null;
   }
 
-  retrieveTouch(event: TouchEvent): Touch | undefined {
-    const touches = Array.from(event.touches);
-
-    for (const touch of touches) {
-      if (touch.identifier === this.touchIdentifier) {
-        return touch;
-      }
-    }
-
-    return undefined;
-  }
-}
-
-class TouchIndex {
-  private static nextIndex: number = 0;
-
-  public static next(): number {
-    return TouchIndex.nextIndex++;
-  }
-
-  public static updateIndex(event: TouchEvent): void {
-    TouchIndex.nextIndex = this.getSmallestMissingIdentifier(event);
-  }
-
-  private static getSmallestMissingIdentifier(event: TouchEvent): number {
-    const identifiers = Array.from(event.touches).map(
-      (touch) => touch.identifier
+  locate(event: PointerEvent): Point {
+    return new Point(
+      event.clientX - this.canvas.offsetLeft,
+      event.clientY - this.canvas.offsetTop
     );
-    console.log("identifiers left", identifiers);
-
-    let smallestMissing = 0;
-    while (identifiers.includes(smallestMissing)) {
-      smallestMissing++;
-    }
-
-    return smallestMissing;
   }
 }
 

@@ -1,5 +1,5 @@
 use futures_channel::mpsc::unbounded;
-use game_core::{Game, FRAME_PER_SECOND};
+use game_core::Game;
 use game_native::{
     players_connector::PlayersConnector, renderer::SdlRenderer,
     server_communicator::ServerCommunicator, startup::setup_logger,
@@ -15,7 +15,7 @@ use sdl2::Sdl;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::spawn;
 use tracing::{error, warn};
 
@@ -108,7 +108,6 @@ async fn main() -> Result<(), String> {
         last_frame = now;
 
         game.render(&mut renderer);
-        renderer.canvas.present();
 
         for (socket_id, message) in game.drain_outbox() {
             let Some(data_channel) = data_channels.get(&socket_id).map(Arc::clone) else {
@@ -123,8 +122,9 @@ async fn main() -> Result<(), String> {
             });
         }
 
-        // Time management
-        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / FRAME_PER_SECOND));
+        // Blocks until the next vsync, which paces the loop at the display's refresh rate.
+        // ponytail: the driver may queue 2-3 frames; limiting that needs Metal/OpenGL directly
+        renderer.canvas.present();
     }
 
     Ok(())
@@ -157,6 +157,7 @@ fn load_assets() -> Assets {
 
     let canvas: Canvas<Window> = window
         .into_canvas()
+        .present_vsync()
         .build()
         .expect("could not make a canvas");
 

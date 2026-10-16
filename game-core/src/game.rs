@@ -16,8 +16,9 @@ use crate::{
     systems::{HandleInputs, RetrievePlayerForInputs, SynchronizePlayerToRemote},
 };
 
-pub const FRAME_PER_SECOND: u32 = 30;
-const STEP: f64 = 1. / FRAME_PER_SECOND as f64;
+// A step costs ~1 µs, so a high rate is free and keeps the wait for the next step under 9 ms
+pub const STEPS_PER_SECOND: u32 = 120;
+const STEP: f64 = 1. / STEPS_PER_SECOND as f64;
 // After a long pause (e.g. a hidden browser tab) drop the backlog instead of fast-forwarding.
 const MAX_LAG: f64 = 0.25;
 
@@ -113,7 +114,7 @@ impl Game {
         self.inbox.push_back(message);
     }
 
-    /// Advances the game by `dt` seconds, in fixed steps of 1 / FRAME_PER_SECOND.
+    /// Advances the game by `dt` seconds, in fixed steps of 1 / STEPS_PER_SECOND.
     pub fn tick(&mut self, dt: f64) {
         self.lag = (self.lag + dt).min(MAX_LAG);
         while self.lag >= STEP {

@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures_util::StreamExt;
 use game_core::{
-    protocol::{MessageToServer, SdpMessage},
+    protocol::{MessageToServer, Ping, Pong, SdpMessage},
     remotes::RemoteInput,
     MessageToGame,
 };
@@ -90,9 +90,20 @@ impl WebRTCUtil {
                 }));
 
                 // Register text message handling
+                let d_for_pongs = Arc::clone(&d);
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let msg_str = String::from_utf8_lossy(&msg.data);
                     trace!("Message from DataChannel '{d_label}' {socket_id}: '{msg_str}'");
+                    // Answered here, not by the game loop, so the remote measures the network alone
+                    if let Ok(Ping { ping }) = serde_json::from_slice(&msg.data) {
+                        let channel = Arc::clone(&d_for_pongs);
+                        return Box::pin(async move {
+                            let pong = serde_json::to_string(&Pong { pong: ping }).unwrap();
+                            if let Err(err) = channel.send_text(pong).await {
+                                warn!("Failed to answer a ping on socket id \"{socket_id}\": {err}");
+                            }
+                        });
+                    }
                     match serde_json::from_slice::<RemoteInput>(&msg.data) {
                         Ok(remote_input) => sender_to_game
                             .unbounded_send(MessageToGame::from_remote(socket_id, remote_input))

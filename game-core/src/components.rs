@@ -4,7 +4,7 @@ use specs::{Component, VecStorage};
 use specs_derive::Component;
 
 use crate::{
-    game::FRAME_PER_SECOND,
+    game::STEPS_PER_SECOND,
     remotes::{ConfigurationInput, Sticks},
 };
 
@@ -13,7 +13,7 @@ const BULLET_BLOCKS_PER_SECOND: f64 = 1.;
 const DEFAULT_PLAYER_RADIUS: f64 = 0.1;
 const DEFAULT_BULLET_RADIUS: f64 = 0.05;
 const DEFAULT_HIT_POINTS_NUMBER: u32 = 20;
-const NUMBER_OF_FRAMES_BETWEEN_SHOTS: u32 = 15;
+const SECONDS_BETWEEN_SHOTS: f64 = 0.5;
 
 #[derive(Component, Clone)]
 #[storage(VecStorage)]
@@ -57,13 +57,13 @@ impl Movement {
     pub fn new_bullet_movement(direction: f64) -> Movement {
         Movement {
             direction,
-            speed: BULLET_BLOCKS_PER_SECOND / FRAME_PER_SECOND as f64,
+            speed: BULLET_BLOCKS_PER_SECOND / STEPS_PER_SECOND as f64,
         }
     }
 
     pub fn set_player_direction(&mut self, direction: f64) {
         self.direction = direction;
-        self.speed = PLAYER_BLOCKS_PER_SECOND / FRAME_PER_SECOND as f64;
+        self.speed = PLAYER_BLOCKS_PER_SECOND / STEPS_PER_SECOND as f64;
     }
 
     pub fn stop(&mut self) {
@@ -150,7 +150,7 @@ pub enum AimStatus {
 pub enum ShootStatus {
     CanShoot,
     Shooting,
-    FrameLeftUntilNextShot(u32),
+    StepsLeftUntilNextShot(u32),
 }
 
 impl Player {
@@ -174,7 +174,9 @@ impl Player {
 
     pub fn update_after_shot(&mut self) {
         self.aim = AimStatus::None;
-        self.shoot = ShootStatus::FrameLeftUntilNextShot(NUMBER_OF_FRAMES_BETWEEN_SHOTS);
+        self.shoot = ShootStatus::StepsLeftUntilNextShot(
+            (SECONDS_BETWEEN_SHOTS * STEPS_PER_SECOND as f64) as u32,
+        );
     }
 }
 

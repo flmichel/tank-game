@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use game_core::{
-    protocol::{MessageToServer, SdpMessage, ServerMessage},
+    protocol::{MessageToServer, Ping, Pong, SdpMessage, ServerMessage},
     remotes::RemoteInput,
     Color, Game, MessageToGame, Rect, Renderer, RoomId, Sprite,
 };
@@ -72,7 +72,13 @@ fn start() -> Result<(), JsValue> {
     let server_url = format!("ws://{}:{SERVER_PORT}/ws", window.location().hostname()?);
     connect_to_server(&server_url, shell.clone())?;
 
-    let context: CanvasRenderingContext2d = canvas.get_context("2d")?.ok_or("no 2d context")?.dyn_into()?;
+    // Desynchronized: the browser may draw it straight to the screen, skipping a compositor frame
+    let attributes = js_sys::Object::new();
+    js_sys::Reflect::set(&attributes, &"desynchronized".into(), &JsValue::TRUE)?;
+    let context: CanvasRenderingContext2d = canvas
+        .get_context_with_context_options("2d", &attributes)?
+        .ok_or("no 2d context")?
+        .dyn_into()?;
     context.set_font("24px sans-serif");
     context.set_text_baseline("top");
     let renderer = CanvasRenderer {
@@ -213,10 +219,19 @@ fn listen_to_remote(peer_connection: &RtcPeerConnection, socket_id: u32, shell: 
     let on_data_channel = Closure::<dyn FnMut(RtcDataChannelEvent)>::new(move |event: RtcDataChannelEvent| {
         let channel = event.channel();
         let shell_for_inputs = shell.clone();
+        let channel_for_pongs = channel.clone();
         let on_message = Closure::<dyn FnMut(MessageEvent)>::new(move |event: MessageEvent| {
             let Some(text) = event.data().as_string() else {
                 return;
             };
+            // Answered here, not by the game loop, so the remote measures the network alone
+            if let Ok(Ping { ping }) = serde_json::from_str(&text) {
+                let pong = serde_json::to_string(&Pong { pong: ping }).unwrap();
+                if let Err(err) = channel_for_pongs.send_with_str(&pong) {
+                    warn!("failed to answer a ping on socket id \"{socket_id}\": {err:?}");
+                }
+                return;
+            }
             match serde_json::from_str::<RemoteInput>(&text) {
                 Ok(input) => shell_for_inputs
                     .borrow_mut()

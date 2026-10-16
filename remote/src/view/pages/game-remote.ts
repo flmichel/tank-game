@@ -12,6 +12,11 @@ export class GameRemote extends LitElement {
       }
       canvas {
         border: 1px solid black;
+        /* No scroll or zoom from a stick, so the browser hands touches over immediately */
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
       }
     `;
   }

@@ -2,10 +2,10 @@ use std::{collections::HashMap, f64::consts::PI};
 
 use game_core::{
     remotes::{ConfigurationInput, GameInput, RemoteInput, Sticks},
-    Color, Game, MessageToGame, Rect, Renderer, Sprite, FRAME_PER_SECOND,
+    Color, Game, MessageToGame, Rect, Renderer, Sprite, STEPS_PER_SECOND,
 };
 
-const STEP: f64 = 1. / FRAME_PER_SECOND as f64;
+const STEP: f64 = 1. / STEPS_PER_SECOND as f64;
 
 /// Where each tank (by name) and missile is drawn.
 #[derive(Default)]
