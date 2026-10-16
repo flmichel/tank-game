@@ -4,7 +4,10 @@
       "path": "server"
     },
     {
-      "path": "game"
+      "path": "game-core"
+    },
+    {
+      "path": "game-native"
     },
     {
       "path": "remote"

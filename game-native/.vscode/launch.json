@@ -63,16 +63,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'game'",
+            "name": "Debug unit tests in library 'game-native'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=game"
+                    "--package=game-native"
                 ],
                 "filter": {
-                    "name": "game",
+                    "name": "game_native",
                     "kind": "lib"
                 }
             },
@@ -82,15 +82,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'game'",
+            "name": "Debug executable 'game-native'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=game",
-                    "--package=game"
+                    "--bin=game-native",
+                    "--package=game-native"
                 ],
                 "filter": {
-                    "name": "game",
+                    "name": "game-native",
                     "kind": "bin"
                 }
             },
@@ -100,16 +100,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'game'",
+            "name": "Debug unit tests in executable 'game-native'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=game",
-                    "--package=game"
+                    "--bin=game-native",
+                    "--package=game-native"
                 ],
                 "filter": {
-                    "name": "game",
+                    "name": "game-native",
                     "kind": "bin"
                 }
             },

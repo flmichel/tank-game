@@ -1,0 +1,17 @@
+[package]
+name = "game-core"
+version = "0.1.0"
+edition = "2021"
+
+# Pure game logic: no IO, no async runtime, no SDL. Must stay buildable for wasm32.
+[dependencies]
+specs = { version = "0.20", default-features = false }
+specs-derive = "0.4"
+serde = { version = "1", features = ["derive"] }
+qrcode = { version = "0.14", default-features = false }
+rand = "0.8"
+tracing = "0.1"
+
+# rand gets its randomness from the browser's crypto API on wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }

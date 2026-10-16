@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::debug;
 
-use crate::game::{MessageToGame, RoomId};
+use game_core::{MessageToGame, RoomId};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]

@@ -1,10 +1,9 @@
 use std::f32::consts::PI;
 
-use futures_channel::mpsc::UnboundedSender;
 use specs::{Component, VecStorage};
 use specs_derive::Component;
 
-use crate::{game::MessageToRemote, remotes::RemoteInput, render::renderer};
+use crate::{game::FRAME_PER_SECOND, remotes::RemoteInput};
 
 const PLAYER_BLOCKS_PER_SECOND: f64 = 0.5;
 const BULLET_BLOCKS_PER_SECOND: f64 = 1.;
@@ -55,13 +54,13 @@ impl Movement {
     pub fn new_bullet_movement(direction: f64) -> Movement {
         Movement {
             direction,
-            speed: BULLET_BLOCKS_PER_SECOND / renderer::FRAME_PER_SECOND as f64,
+            speed: BULLET_BLOCKS_PER_SECOND / FRAME_PER_SECOND as f64,
         }
     }
 
     pub fn set_player_direction(&mut self, direction: f64) {
         self.direction = direction;
-        self.speed = PLAYER_BLOCKS_PER_SECOND / renderer::FRAME_PER_SECOND as f64;
+        self.speed = PLAYER_BLOCKS_PER_SECOND / FRAME_PER_SECOND as f64;
     }
 
     pub fn stop(&mut self) {
@@ -120,7 +119,6 @@ impl Circle {
 pub struct Player {
     pub socket_id: u32,
     pub id: String,
-    pub sender_to_remote: UnboundedSender<MessageToRemote>,
     pub name: String,
     pub status: ReadyStatus,
     pub aim: AimStatus,
@@ -144,11 +142,10 @@ pub enum ShootStatus {
 }
 
 impl Player {
-    pub fn new(socket_id: u32, id: String, sender_to_remote: UnboundedSender<MessageToRemote>) -> Player {
+    pub fn new(socket_id: u32, id: String) -> Player {
         Player {
             socket_id,
             id,
-            sender_to_remote,
             name: String::new(),
             status: ReadyStatus::NotReady,
             aim: AimStatus::None,

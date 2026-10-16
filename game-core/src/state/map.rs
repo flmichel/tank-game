@@ -1,9 +1,5 @@
 use rand::Rng;
-use std::{
-    collections::HashSet,
-    fs::File,
-    io::{BufRead, BufReader},
-};
+use std::collections::HashSet;
 
 use crate::error::{Error, ErrorKind::*};
 
@@ -29,21 +25,13 @@ pub enum BlockKind {
 }
 
 impl Map {
-    pub fn from_file(path: &str, resolution: (u32, u32)) -> Result<Map, Error> {
-        let file = File::open(path).map_err(|err| {
-            Error::from(err, ConfigurationError).explain("configuration file not found")
-        })?;
-        let reader = BufReader::new(file);
-
+    pub fn parse(map: &str, resolution: (u32, u32)) -> Map {
         let mut wall_set = HashSet::new();
         let mut spawns = Vec::new();
         let mut block_matrix = Vec::new();
         let mut y = 0;
 
-        for line in reader.lines() {
-            let row = line.map_err(|err| {
-                Error::from(err, ConfigurationError).explain("could not parse line")
-            })?;
+        for row in map.lines() {
             let chars: Vec<char> = row.chars().collect();
             let mut block_row = Vec::new();
 
@@ -72,14 +60,14 @@ impl Map {
         let dimension = Dimensions(16, 9);
         let block_size = resolution.0 / dimension.0 as u32;
 
-        Ok(Map {
+        Map {
             dimensions: Dimensions(16, 9),
             wall_set,
             spawns,
             block_matrix,
             available_spawns,
             block_size,
-        })
+        }
     }
 
     pub fn get_spawn_block(&mut self) -> Result<Block, Error> {

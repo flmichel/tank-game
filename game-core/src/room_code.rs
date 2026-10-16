@@ -1,7 +1,7 @@
 use qrcode::QrCode;
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
 use tracing::info;
+
+use crate::render::{Color, Rect};
 
 pub struct RoomCode {
     qr_code: QrCode,

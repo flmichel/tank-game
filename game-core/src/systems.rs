@@ -1,10 +1,8 @@
 use specs::{Entities, Entity, Join, ReadStorage, System, WriteExpect, WriteStorage};
-use tokio::spawn;
 use tracing::{debug, error, trace, warn};
-use std::sync::Arc;
 
 use crate::{
-    components::{AimStatus, Bullet, Circle, Movement, Player, Position, ReadyStatus, ShootStatus}, game::{MessageToRemote, SynchronizePlayer}, remotes::{ConfigurationInput, GameInput, PlayerInput, RemoteInput}, state::{
+    components::{AimStatus, Bullet, Circle, Movement, Player, Position, ReadyStatus, ShootStatus}, game::{MessageToRemote, Outbox, SynchronizePlayer}, remotes::{ConfigurationInput, GameInput, PlayerInput, RemoteInput}, state::{
         game_state::{Phase, State},
         Block, Map,
     }
@@ -63,15 +61,16 @@ impl<'a> System<'a> for HandleInputs {
         WriteStorage<'a, Position>,
         WriteStorage<'a, Circle>,
         WriteExpect<'a, State>,
+        WriteExpect<'a, Outbox>,
     );
 
     fn run(
         &mut self,
-        (entities, players, bullet, movements, positions, circles, state): Self::SystemData,
+        (entities, players, bullet, movements, positions, circles, state, outbox): Self::SystemData,
     ) {
         match state.phase {
             Phase::BeforeNextGame | Phase::BreakInGame => self.handle_configuration_inputs(
-                entities, players, movements, positions, circles, state,
+                entities, players, movements, positions, circles, state, outbox,
             ),
             Phase::InGame => {
                 let (players, movements) = self.handle_game_inputs(players, movements);
@@ -92,6 +91,7 @@ impl HandleInputs {
         mut positions: WriteStorage<'a, Position>,
         mut circles: WriteStorage<'a, Circle>,
         mut state: WriteExpect<'a, State>,
+        mut outbox: WriteExpect<'a, Outbox>,
     ) {
         for player in (&mut players).join() {
             match &player.next_input {
@@ -119,9 +119,7 @@ impl HandleInputs {
 
             for (player_entity, player) in (&entities, &mut players).join() {
                 player.status = ReadyStatus::NotReady;
-                if let Err(e) = player.sender_to_remote.unbounded_send(MessageToRemote::GameStart) {
-                    error!("Failed to send GameStart message: {:?}", e);
-                }
+                outbox.0.push((player.socket_id, MessageToRemote::GameStart));
                 let spawn = state.map.get_spawn_block();
                 match spawn {
                     Err(err) => error!("Couldn't spawn player: {}.", err),
@@ -333,21 +331,14 @@ impl<'a> System<'a> for SynchronizePlayerToRemote {
         for (entity, synchronize_player) in (&entities, &synchronize_players).join() {
             if let Some(player) = retrieve_player_from_id(&mut players, &synchronize_player.player_id) {
                 player.socket_id = synchronize_player.socket_id;
-                player.sender_to_remote = synchronize_player.sender_to_remote.clone();
             } else {
                 let player_entity = entities.create();
-                
+
                 players
                     .insert(player_entity, Player::new(
                         synchronize_player.socket_id,
-                        synchronize_player.player_id.clone(),
-                        synchronize_player.sender_to_remote.clone()))
+                        synchronize_player.player_id.clone()))
                     .unwrap();
-                warn!("sending message to remote");
-                let data_channel = Arc::clone(&synchronize_player.data_channel);
-                /*if let Err(e) = synchronize_player.sender_to_remote.unbounded_send(MessageToRemote::PlayerDied) {
-                    error!("Failed to send GameStart message: {:?}", e);
-                }*/
             }
             // delete the entity
             entities.delete(entity).expect("Failed to delete entity");

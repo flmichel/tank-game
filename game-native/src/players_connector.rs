@@ -1,8 +1,10 @@
-use anyhow::Result;
-use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use tokio::spawn;
+use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use game_core::{
+    remotes::{ConfigurationInput, PlayerInput, RemoteInput},
+    MessageToGame, SynchronizePlayer,
+};
 use std::sync::Arc;
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, trace};
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors,
@@ -19,12 +21,16 @@ use webrtc::{
 };
 
 use crate::{
-    error::{Error, ErrorKind}, game::{MessageToGame, SynchronizePlayer}, remotes::{ConfigurationInput, PlayerInput, RemoteInput}, server_communicator::{MessageToServer, SdpMessage}, signal::{decode, encode}
+    server_communicator::{MessageToServer, SdpMessage}, signal::{decode, encode}
 };
+
+/// A remote's data channel, handed to the main loop so it can deliver the game's outbox.
+pub type DataChannelRegistration = (u32, Arc<RTCDataChannel>);
 
 pub struct PlayersConnector {
     sender_to_server: UnboundedSender<MessageToServer>,
     sender_to_game: UnboundedSender<MessageToGame>,
+    sender_data_channel: UnboundedSender<DataChannelRegistration>,
     receiver: UnboundedReceiver<SdpMessage>,
     webrtc_util: WebRTCUtil,
 }
@@ -39,6 +45,7 @@ impl WebRTCUtil {
         &self,
         offer: String,
         sender_to_game: UnboundedSender<MessageToGame>,
+        sender_data_channel: UnboundedSender<DataChannelRegistration>,
         socket_id: u32,
     ) -> RTCPeerConnection {
         let peer_connection = self
@@ -67,56 +74,15 @@ impl WebRTCUtil {
             debug!("New DataChannel {d_label} {d_id} with socket id \"{socket_id}\".");
 
             let sender_to_game = sender_to_game.clone();
-            let (sender_to_remote, mut receiver_remote) = unbounded();
+            sender_data_channel
+                .unbounded_send((socket_id, Arc::clone(&d)))
+                .unwrap();
 
-            // Register channel opening handling
             Box::pin(async move {
-                let d2 = Arc::clone(&d);
-                let d3 = Arc::clone(&d);
                 let d_label2 = d_label.clone();
-                let d_label3 = d_label.clone();
-                let d_id2 = d_id;
-
                 d.on_open(Box::new(move || {
-                    println!("Data channel '{d_label2}'-'{d_id2}' open. Random messages will now be sent to any connected DataChannels every 5 seconds");
-                    
-                    Box::pin(async move {
-                        spawn(async move { loop {
-                            if let Ok(Some(message_to_remote)) = receiver_remote.try_next() {
-                                match serde_json::to_string(&message_to_remote) {
-                                    Ok(message) => {
-                                        warn!("Sending Message to remote from DataChannel {socket_id}: '{message}'");
-                                        warn!("Sending '{message}' in channel '{d_label2}'-'{d_id2}'");
-                                        let result: Result::<usize> = d2.send_text("hello").await.map_err(Into::into);
-                                        match result {
-                                            Ok(_) => {warn!("sent successfully")}
-                                            Err(err) => {
-                                                error!("error sending a message to a remote: {err}");
-                                            }
-                                        }
-                                        warn!("message has finished sending the message")
-                                    }
-                                    Err(_) => {
-                                        error!("error parsing a message to a remote");
-                                    }
-                                }
-                            }
-                        };});
-
-                        /*let mut result = Result::<usize>::Ok(0);
-                        while result.is_ok() {
-                            let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(5));
-                            tokio::pin!(timeout);
-
-                            tokio::select! {
-                                _ = timeout.as_mut() =>{
-                                    let message = math_rand_alpha(15);
-                                    println!("Sending '{message}' in channel '{d_label3}'-'{d_id2}'");
-                                    result = d3.send_text(message).await.map_err(Into::into);
-                                }
-                            };
-                        }*/
-                    })
+                    debug!("Data channel '{d_label2}'-'{d_id}' open.");
+                    Box::pin(async {})
                 }));
 
                 // Register text message handling
@@ -126,9 +92,7 @@ impl WebRTCUtil {
                     let remote_input: RemoteInput = serde_json::from_str(&msg_str).unwrap();
 
                     if let RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(player_id)) = remote_input {
-                        let sender_to_remote = sender_to_remote.clone();
-                        let data_channel = Arc::clone(&d3);
-                        sender_to_game.unbounded_send(MessageToGame::SynchronizePlayer(SynchronizePlayer { socket_id, player_id, sender_to_remote, data_channel})).unwrap();
+                        sender_to_game.unbounded_send(MessageToGame::SynchronizePlayer(SynchronizePlayer { socket_id, player_id })).unwrap();
                     } else {
                         sender_to_game
                         .unbounded_send(MessageToGame::PlayerInput(PlayerInput {
@@ -186,6 +150,7 @@ impl PlayersConnector {
         sender_to_server: UnboundedSender<MessageToServer>,
         sender_to_game: UnboundedSender<MessageToGame>,
         receiver: UnboundedReceiver<SdpMessage>,
+        sender_data_channel: UnboundedSender<DataChannelRegistration>,
     ) -> Self {
         let mut m = MediaEngine::default();
         let fastest_codec = RTCRtpCodecParameters {
@@ -221,6 +186,7 @@ impl PlayersConnector {
         Self {
             sender_to_server,
             sender_to_game,
+            sender_data_channel,
             receiver,
             webrtc_util: WebRTCUtil { api, configuration },
         }
@@ -236,6 +202,7 @@ impl PlayersConnector {
                     .start_peer_connection(
                         offer.data,
                         self.sender_to_game.clone(),
+                        self.sender_data_channel.clone(),
                         next_player_socket_id,
                     )
                     .await;

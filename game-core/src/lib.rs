@@ -1,12 +1,11 @@
 pub mod components;
 pub mod error;
 pub mod game;
-pub mod players_connector;
 pub mod remotes;
 pub mod render;
 pub mod room_code;
-pub mod server_communicator;
-pub mod signal;
-pub mod startup;
 pub mod state;
 pub mod systems;
+
+pub use game::*;
+pub use render::{Color, Rect, Renderer, Sprite};
