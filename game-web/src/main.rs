@@ -13,7 +13,7 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
     CanvasRenderingContext2d, HtmlCanvasElement, HtmlImageElement, MessageEvent, RtcConfiguration,
     RtcDataChannel, RtcDataChannelEvent, RtcIceGatheringState, RtcIceServer, RtcPeerConnection,
-    RtcSdpType, RtcSessionDescriptionInit, WebSocket,
+    RtcSdpType, RtcSessionDescriptionInit, UrlSearchParams, WebSocket,
 };
 
 const MAP: &str = include_str!("../../game-native/assets/map.txt");
@@ -69,7 +69,11 @@ fn start() -> Result<(), JsValue> {
         next_socket_id: 0,
     }));
 
-    let server_url = format!("ws://{}:{SERVER_PORT}/ws", window.location().hostname()?);
+    // `?server=ws://host:port/ws` overrides the default, e.g. for local testing
+    let server_url = match UrlSearchParams::new_with_str(&window.location().search()?)?.get("server") {
+        Some(url) => url,
+        None => format!("ws://{}:{SERVER_PORT}/ws", window.location().hostname()?),
+    };
     connect_to_server(&server_url, shell.clone())?;
 
     // Desynchronized: the browser may draw it straight to the screen, skipping a compositor frame

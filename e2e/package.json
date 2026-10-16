@@ -1,0 +1,11 @@
+{
+  "name": "tank-game-e2e",
+  "private": true,
+  "description": "End-to-end latency test: web game + simulated phones in headless Chrome",
+  "scripts": {
+    "test": "node e2e.js good 2"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.43.1"
+  }
+}
