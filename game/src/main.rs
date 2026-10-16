@@ -90,7 +90,7 @@ async fn main() -> Result<(), String> {
             }
         }
 
-        if let Ok(Some(message)) = receiver_game.try_next() {
+        if let Ok(message) = receiver_game.try_recv() {
             match message {
                 MessageToGame::RoomId(id) => {
                     debug!("Received room id \"{}\" from server.", id.0);

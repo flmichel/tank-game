@@ -82,7 +82,7 @@ impl WebRTCUtil {
                     
                     Box::pin(async move {
                         spawn(async move { loop {
-                            if let Ok(Some(message_to_remote)) = receiver_remote.try_next() {
+                            if let Ok(message_to_remote) = receiver_remote.try_recv() {
                                 match serde_json::to_string(&message_to_remote) {
                                     Ok(message) => {
                                         warn!("Sending Message to remote from DataChannel {socket_id}: '{message}'");
@@ -229,7 +229,7 @@ impl PlayersConnector {
     pub async fn start(&mut self) {
         let mut next_player_socket_id: u32 = 0;
         loop {
-            if let Ok(Some(offer)) = self.receiver.try_next() {
+            if let Ok(offer) = self.receiver.try_recv() {
                 debug!("Received an offer in players_connector.");
                 let peer_connection = self
                     .webrtc_util

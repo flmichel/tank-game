@@ -40,8 +40,8 @@ pub async fn start_web_application(
         .route("/api/login", post(login))
         .route("/api/user/registration", post(create_user))
         .route("/api/user/{name}", get(is_name_available))
-        .route("/api/user/email/{email}}", get(is_email_available))
-        .route("/api/game/:id", post(post_sdp_session))
+        .route("/api/user/email/{email}", get(is_email_available))
+        .route("/api/game/{id}", post(post_sdp_session))
         .layer(CorsLayer::permissive())
         .layer(Extension(Repo::<Account>::new(database_pool)))
         .with_state(room_map);
@@ -52,8 +52,10 @@ pub async fn start_web_application(
     })?;
 
     info!("Start web application at address {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .map_err(|err| Error::from(err, ConfigurationError).explain("failed to start serving"))?;
+    axum::serve(listener, app)
         .await
         .map_err(|err| Error::from(err, ConfigurationError).explain("failed to start serving"))
 }
