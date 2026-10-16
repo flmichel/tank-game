@@ -28,7 +28,7 @@ export class SdpOffer implements RequestHandler {
 }
 
 export function sendStringToGame(string: string) {
-  state.game.channel!.send('"' + string + '"');
+  state.game.channel!.send(JSON.stringify(string));
 }
 
 export function sendToGame(object: object) {
@@ -36,28 +36,18 @@ export function sendToGame(object: object) {
 }
 
 function stringifyObjectInKebabCase(obj: any): string {
-  if (typeof obj !== "object" || obj === null) {
-    if (typeof obj === "string") {
-      return `"${obj}"`;
+  // The replacer renames each object's keys; JSON.stringify then recurses into the renamed copy.
+  return JSON.stringify(obj, (_key, value) => {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return value;
     }
-    return String(obj);
-  }
-
-  const result: any = Array.isArray(obj) ? [] : {};
-
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const transformedKey = key.replace(
-        /[A-Z]/g,
-        (match) => "-" + match.toLowerCase()
-      );
-      result[`"${transformedKey}"`] = stringifyObjectInKebabCase(obj[key]);
+    const result: any = {};
+    for (const key in value) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        result[key.replace(/[A-Z]/g, (match) => "-" + match.toLowerCase())] =
+          value[key];
+      }
     }
-  }
-
-  const keyValuePairs = Object.entries(result)
-    .map(([key, value]) => `${key}:${value}`)
-    .join(",");
-
-  return `{${keyValuePairs}}`;
+    return result;
+  });
 }

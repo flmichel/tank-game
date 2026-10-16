@@ -22,11 +22,6 @@ export class ToggleReady implements Action {
     state.game.state.isReady = isReady;
     let messageToGame = isReady ? "ready" : "not-ready";
     sendStringToGame(messageToGame);
-
-    // Since the game cannot send message back yet we consider that the game starts when this player is ready
-    /*if (isReady) {
-      state.game.state.phase = GamePhase.InGame;
-    }*/
   }
 }
 
@@ -66,10 +61,11 @@ export class EnterGame implements Action {
   }
 }
 
+// Values match the game's serde serialization of MessageToRemote
 export enum GameMessage {
-  GameOver,
-  GameStart,
-  PlayerDied,
+  GameOver = "GameOver",
+  GameStart = "GameStart",
+  PlayerDied = "PlayerDied",
 }
 
 export class HandleGameMessage implements Action {
@@ -80,7 +76,11 @@ export class HandleGameMessage implements Action {
   }
 
   execute(): void {
-    if (this.message == GameMessage.GameOver) {
+    if (this.message == GameMessage.GameStart) {
+      state.game.state.phase = GamePhase.InGame;
+      // The game resets every player to not ready when a round starts
+      state.game.state.isReady = false;
+    } else if (this.message == GameMessage.GameOver) {
       state.game.state.phase = GamePhase.BeforeNextGame;
     }
   }

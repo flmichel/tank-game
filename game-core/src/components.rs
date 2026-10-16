@@ -3,7 +3,10 @@ use std::f32::consts::PI;
 use specs::{Component, VecStorage};
 use specs_derive::Component;
 
-use crate::{game::FRAME_PER_SECOND, remotes::RemoteInput};
+use crate::{
+    game::FRAME_PER_SECOND,
+    remotes::{ConfigurationInput, Sticks},
+};
 
 const PLAYER_BLOCKS_PER_SECOND: f64 = 0.5;
 const BULLET_BLOCKS_PER_SECOND: f64 = 1.;
@@ -123,9 +126,18 @@ pub struct Player {
     pub status: ReadyStatus,
     pub aim: AimStatus,
     pub shoot: ShootStatus,
-    pub next_input: RemoteInput,
+    pub input: Input,
     pub is_alive: bool,
     pub is_winner: bool,
+}
+
+/// What the player's remote asked for: every message is folded in by `RetrievePlayerForInputs`,
+/// then `HandleInputs` consumes it according to the phase.
+#[derive(Default)]
+pub struct Input {
+    pub sticks: Sticks,
+    pub shoot: Option<f64>,
+    pub configuration: Vec<ConfigurationInput>,
 }
 
 #[derive(PartialEq)]
@@ -150,7 +162,7 @@ impl Player {
             status: ReadyStatus::NotReady,
             aim: AimStatus::None,
             shoot: ShootStatus::CanShoot,
-            next_input: RemoteInput::NoInput,
+            input: Input::default(),
             is_alive: true,
             is_winner: false,
         }

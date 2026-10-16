@@ -186,13 +186,21 @@ fn handle_game_message<E>(
         "Received a sdp answer from {}: {}",
         game_room_address, message
     );
-    let sdp_answer: SdpMessage = parse_message(&message).unwrap();
-    request_map
-        .lock()
-        .unwrap()
-        .get(&sdp_answer.id)
-        .unwrap()
-        .try_send(sdp_answer.data)
-        .unwrap();
+    let sdp_answer: SdpMessage = match parse_message(&message) {
+        Ok(sdp_answer) => sdp_answer,
+        Err(err) => {
+            error!("invalid message from {}: {:?}", game_room_address, err);
+            return future::ok(());
+        }
+    };
+    // The request may have timed out already: its return channel is then gone or closed.
+    let return_channel = request_map.lock().unwrap().remove(&sdp_answer.id);
+    match return_channel.map(|channel| channel.try_send(sdp_answer.data)) {
+        Some(Ok(())) => {}
+        _ => debug!(
+            "dropping sdp answer {} from {}: nobody is waiting for it",
+            sdp_answer.id, game_room_address
+        ),
+    }
     future::ok(())
 }

@@ -73,7 +73,6 @@ impl Game {
     pub fn new(map: &str, resolution: (u32, u32)) -> Self {
         let mut world = World::new();
         world.register::<RoomId>();
-        world.register::<PlayerInput>();
         world.register::<SynchronizePlayer>();
         world.register::<Position>();
         world.register::<Movement>();
@@ -89,11 +88,17 @@ impl Game {
             resolution,
         });
         world.insert(Outbox::default());
+        world.insert(Vec::<PlayerInput>::new());
 
+        // A remote's player must exist before its inputs are applied
         let dispatcher = DispatcherBuilder::new()
-            .with(RetrievePlayerForInputs, "RetrievePlayerForInputs", &[])
+            .with(SynchronizePlayerToRemote, "SynchronizePlayerToRemote", &[])
+            .with(
+                RetrievePlayerForInputs,
+                "RetrievePlayerForInputs",
+                &["SynchronizePlayerToRemote"],
+            )
             .with(HandleInputs, "HandleInputs", &["RetrievePlayerForInputs"])
-            .with(SynchronizePlayerToRemote, "SynchronizePlayerToRemote", &["RetrievePlayerForInputs"])
             .build();
 
         Game {
@@ -125,22 +130,22 @@ impl Game {
         std::mem::take(&mut self.world.write_resource::<Outbox>().0)
     }
 
-    // One message per step, as before the split: two inputs from the same player in one step
-    // would overwrite each other in `Player::next_input`.
+    // Every message received since the last step is applied in this step, so inputs never queue up.
     fn step(&mut self) {
-        match self.inbox.pop_front() {
-            Some(MessageToGame::RoomId(id)) => {
-                debug!("Received room id \"{}\" from server.", id.0);
-                self.world.write_resource::<State>().room_code =
-                    RoomCode::new(format!("http://192.168.178.24:8080/?room-id={}", id.0));
+        for message in self.inbox.drain(..) {
+            match message {
+                MessageToGame::RoomId(id) => {
+                    debug!("Received room id \"{}\" from server.", id.0);
+                    self.world.write_resource::<State>().room_code =
+                        RoomCode::new(format!("http://192.168.178.24:8080/?room-id={}", id.0));
+                }
+                MessageToGame::PlayerInput(input) => {
+                    self.world.write_resource::<Vec<PlayerInput>>().push(input);
+                }
+                MessageToGame::SynchronizePlayer(synchronize_player) => {
+                    self.world.create_entity().with(synchronize_player).build();
+                }
             }
-            Some(MessageToGame::PlayerInput(input)) => {
-                self.world.create_entity().with(input).build();
-            }
-            Some(MessageToGame::SynchronizePlayer(synchronize_player)) => {
-                self.world.create_entity().with(synchronize_player).build();
-            }
-            None => {}
         }
 
         self.dispatcher.dispatch(&self.world);

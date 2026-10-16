@@ -79,11 +79,21 @@ impl Map {
         Ok(self.available_spawns.remove(random_index))
     }
 
+    /// Makes every spawn available again, for a new round.
+    pub fn reset_spawns(&mut self) {
+        self.available_spawns = self.spawns.clone();
+    }
+
     pub fn block_size(&self) -> u32 {
         self.block_size
     }
 
-    pub fn is_wall(&self, block: &Block) -> bool {
-        self.wall_set.contains(block)
+    /// Whether the point is in a wall. Everything outside the map counts as a wall.
+    pub fn is_wall(&self, x: f64, y: f64) -> bool {
+        let Dimensions(width, height) = self.dimensions;
+        if x < 0. || y < 0. || x >= width as f64 || y >= height as f64 {
+            return true;
+        }
+        self.wall_set.contains(&Block(x as u8, y as u8))
     }
 }

@@ -1,6 +1,21 @@
-import { sendStringToGame, sendToGame } from "../api/game";
-import { state } from "../state/state";
+import { sendToGame } from "../api/game";
+import { GamePhase, state } from "../state/state";
 import { Action, trigger } from "./actions";
+
+let seq = 0;
+
+// Sent at 30 Hz during the game, touched or not: a lost state (even a release) is replaced by the next one
+export function sendSticks(inputs: RTCDataChannel) {
+  if (state.game.state.phase !== GamePhase.InGame) return;
+  const { leftController, rightController } = state.remote;
+  inputs.send(
+    JSON.stringify({
+      seq: ++seq,
+      move: leftController.direction,
+      aim: rightController.direction,
+    })
+  );
+}
 
 export class SetControllerCenter implements Action {
   startingPoint: Point;
@@ -30,21 +45,15 @@ export class SetControllerDirection implements Action {
   }
 
   execute(): void {
-    if (!state.remote.leftController.startingPoint) return;
+    let controller =
+      this.controllerId == ControllerId.MOVEMENT
+        ? state.remote.leftController
+        : state.remote.rightController;
+    if (!controller.startingPoint) return;
 
-    if (this.controllerId == ControllerId.MOVEMENT) {
-      let radianDirection =
-        state.remote.leftController.startingPoint!.getDirectionInRadians(
-          this.currentPoint
-        );
-      sendToGame({ move: radianDirection });
-    } else {
-      let radianDirection =
-        state.remote.rightController.startingPoint!.getDirectionInRadians(
-          this.currentPoint
-        );
-      sendToGame({ aim: radianDirection });
-    }
+    controller.direction = controller.startingPoint.getDirectionInRadians(
+      this.currentPoint
+    );
   }
 }
 
@@ -59,15 +68,16 @@ export class StopController implements Action {
 
   execute(): void {
     if (this.controllerId == ControllerId.MOVEMENT) {
-      sendStringToGame("stop");
+      state.remote.leftController.direction = null;
     } else {
+      state.remote.rightController.direction = null;
       if (this.lastLocation !== null) {
         let radianDirection =
           state.remote.rightController.startingPoint!.getDirectionInRadians(
             this.lastLocation
           );
-        sendToGame({ aim: radianDirection });
-        sendStringToGame("shoot");
+        // Reliable channel: the shot carries its aim, it can overtake the latest stick state
+        sendToGame({ shoot: radianDirection });
       }
     }
   }
@@ -152,9 +162,10 @@ export class CanvasData {
       const currentY = touch.clientY - this.canvas.offsetTop;
       const currentLocation = new Point(currentX, currentY);
 
+      // Every move updates the stick state that `sendSticks` streams; only re-centering is paced
+      trigger(new SetControllerDirection(this.controllerId, currentLocation));
       let currentTime = new Date().getTime();
       if (!this.lastUpdateTime || this.lastUpdateTime + 80 < currentTime) {
-        trigger(new SetControllerDirection(this.controllerId, currentLocation));
         if (
           this.lastLocation!.getDistanceFrom(this.lastCenter!) > 25 &&
           this.controllerId == ControllerId.MOVEMENT

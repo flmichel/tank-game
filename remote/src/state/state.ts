@@ -62,6 +62,8 @@ interface Remote {
 
 interface Controller {
   startingPoint: Point | null;
+  // Radians, null while the stick is released
+  direction: number | null;
 }
 
 export interface DisplaySettings {
@@ -75,8 +77,8 @@ export let state: State = {
     authenticationState: AuthenticationState.LoggedOut,
   },
   remote: {
-    leftController: { startingPoint: null },
-    rightController: { startingPoint: null },
+    leftController: { startingPoint: null, direction: null },
+    rightController: { startingPoint: null, direction: null },
   },
   game: {
     isChannelOpen: false,

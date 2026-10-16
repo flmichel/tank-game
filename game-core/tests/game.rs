@@ -30,7 +30,7 @@ fn two_ready_players_start_the_game() {
         }));
     }
 
-    // A long frame is capped, but still runs enough steps for the 4 queued messages
+    // A long frame is capped; the 4 queued messages are all applied in its first step
     game.tick(1.0);
 
     let outbox = game.drain_outbox();

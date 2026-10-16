@@ -1,7 +1,7 @@
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures_util::{future, pin_mut, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::debug;
+use tracing::{debug, error};
 
 use game_core::{
     protocol::{MessageToServer, SdpMessage, ServerMessage},
@@ -36,8 +36,13 @@ impl ServerCommunicator {
 
         let handle_server_messages = read.for_each(|message| async {
             debug!("Received message from server: {:?}.", message);
-            let message = message.unwrap();
-            let message: ServerMessage = serde_json::from_str(&message.to_text().unwrap()).unwrap();
+            let message = match parse_server_message(message) {
+                Ok(message) => message,
+                Err(err) => {
+                    error!("Dropping invalid message from server: {err}");
+                    return;
+                }
+            };
             match message {
                 ServerMessage::SdpOffer(sdp_offer) => self
                     .sender_to_player_connector
@@ -62,4 +67,10 @@ impl ServerCommunicator {
         pin_mut!(handle_server_messages, handle_answer);
         future::select(handle_server_messages, handle_answer).await;
     }
+}
+
+fn parse_server_message(
+    message: Result<Message, tokio_tungstenite::tungstenite::Error>,
+) -> anyhow::Result<ServerMessage> {
+    Ok(serde_json::from_str(message?.to_text()?)?)
 }

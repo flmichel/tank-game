@@ -227,8 +227,10 @@ fn listen_to_remote(peer_connection: &RtcPeerConnection, socket_id: u32, shell: 
         });
         channel.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
         on_message.forget();
-        // The remote opens a second channel once connected and listens on that one: last one wins
-        shell.borrow_mut().data_channels.insert(socket_id, channel);
+        // Inputs arrive on both channels; the game's messages go back on the reliable one
+        if channel.label() == "channel" {
+            shell.borrow_mut().data_channels.insert(socket_id, channel);
+        }
     });
     peer_connection.set_ondatachannel(Some(on_data_channel.as_ref().unchecked_ref()));
     on_data_channel.forget();

@@ -1,11 +1,13 @@
+use anyhow::{Context, Result};
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures_util::StreamExt;
 use game_core::{
     protocol::{MessageToServer, SdpMessage},
     remotes::RemoteInput,
     MessageToGame,
 };
 use std::sync::Arc;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace, warn};
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors,
@@ -31,7 +33,7 @@ pub struct PlayersConnector {
     sender_to_game: UnboundedSender<MessageToGame>,
     sender_data_channel: UnboundedSender<DataChannelRegistration>,
     receiver: UnboundedReceiver<SdpMessage>,
-    webrtc_util: WebRTCUtil,
+    webrtc_util: Arc<WebRTCUtil>,
 }
 
 struct WebRTCUtil {
@@ -46,12 +48,12 @@ impl WebRTCUtil {
         sender_to_game: UnboundedSender<MessageToGame>,
         sender_data_channel: UnboundedSender<DataChannelRegistration>,
         socket_id: u32,
-    ) -> RTCPeerConnection {
+    ) -> Result<RTCPeerConnection> {
+        let offer = serde_json::from_str::<RTCSessionDescription>(&decode(&offer)?)?;
         let peer_connection = self
             .api
             .new_peer_connection(self.configuration.clone())
-            .await
-            .expect("peer connection creation failed");
+            .await?;
 
         peer_connection.on_peer_connection_state_change(Box::new(
             move |s: RTCPeerConnectionState| {
@@ -73,9 +75,12 @@ impl WebRTCUtil {
             debug!("New DataChannel {d_label} {d_id} with socket id \"{socket_id}\".");
 
             let sender_to_game = sender_to_game.clone();
-            sender_data_channel
-                .unbounded_send((socket_id, Arc::clone(&d)))
-                .unwrap();
+            // The game's outbox goes over the reliable "channel"; others (e.g. "inputs") are inbound only.
+            if d_label == "channel" {
+                sender_data_channel
+                    .unbounded_send((socket_id, Arc::clone(&d)))
+                    .unwrap();
+            }
 
             Box::pin(async move {
                 let d_label2 = d_label.clone();
@@ -86,42 +91,34 @@ impl WebRTCUtil {
 
                 // Register text message handling
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
-                    let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
+                    let msg_str = String::from_utf8_lossy(&msg.data);
                     trace!("Message from DataChannel '{d_label}' {socket_id}: '{msg_str}'");
-                    let remote_input: RemoteInput = serde_json::from_str(&msg_str).unwrap();
-
-                    sender_to_game
-                        .unbounded_send(MessageToGame::from_remote(socket_id, remote_input))
-                        .unwrap();
+                    match serde_json::from_slice::<RemoteInput>(&msg.data) {
+                        Ok(remote_input) => sender_to_game
+                            .unbounded_send(MessageToGame::from_remote(socket_id, remote_input))
+                            .unwrap(),
+                        Err(err) => warn!(
+                            "Dropping invalid message from DataChannel '{d_label}' {socket_id}: {err}"
+                        ),
+                    }
                     Box::pin(async {})
                 }));
             })
         }));
 
-        let offer = serde_json::from_str::<RTCSessionDescription>(&decode(offer.as_str()).unwrap())
-            .unwrap();
-        peer_connection
-            .set_remote_description(offer)
-            .await
-            .expect("failed to set remote sessionDescription");
+        peer_connection.set_remote_description(offer).await?;
 
-        peer_connection
+        Ok(peer_connection)
     }
 
-    async fn create_answer(&self, peer_connection: &RTCPeerConnection) -> String {
-        let answer = peer_connection
-            .create_answer(None)
-            .await
-            .expect("failed to create answer");
+    async fn create_answer(&self, peer_connection: &RTCPeerConnection) -> Result<String> {
+        let answer = peer_connection.create_answer(None).await?;
 
         // Create channel that is blocked until ICE Gathering is complete
         let mut gather_complete = peer_connection.gathering_complete_promise().await;
 
         // Sets the LocalDescription, and starts our UDP listeners
-        peer_connection
-            .set_local_description(answer)
-            .await
-            .expect("failed to set local description");
+        peer_connection.set_local_description(answer).await?;
 
         // Block until ICE Gathering is complete, disabling trickle ICE
         // we do this because we only can exchange one signaling message
@@ -131,9 +128,9 @@ impl WebRTCUtil {
         let answer = peer_connection
             .local_description()
             .await
-            .expect("failed to get local description");
+            .context("no local description")?;
 
-        serde_json::to_string(&answer).expect("failed to unmarshal")
+        Ok(serde_json::to_string(&answer)?)
     }
 }
 
@@ -180,26 +177,36 @@ impl PlayersConnector {
             sender_to_game,
             sender_data_channel,
             receiver,
-            webrtc_util: WebRTCUtil { api, configuration },
+            webrtc_util: Arc::new(WebRTCUtil { api, configuration }),
         }
     }
 
     pub async fn start(&mut self) {
         let mut next_player_socket_id: u32 = 0;
-        loop {
-            if let Ok(Some(offer)) = self.receiver.try_next() {
-                debug!("Received an offer in players_connector.");
-                let peer_connection = self
-                    .webrtc_util
-                    .start_peer_connection(
-                        offer.data,
-                        self.sender_to_game.clone(),
-                        self.sender_data_channel.clone(),
-                        next_player_socket_id,
-                    )
-                    .await;
-                next_player_socket_id += 1;
-                let answer = self.webrtc_util.create_answer(&peer_connection).await;
+        while let Some(offer) = self.receiver.next().await {
+            debug!("Received an offer in players_connector.");
+            let socket_id = next_player_socket_id;
+            next_player_socket_id += 1;
+            let webrtc_util = Arc::clone(&self.webrtc_util);
+            let sender_to_game = self.sender_to_game.clone();
+            let sender_data_channel = self.sender_data_channel.clone();
+            let sender_to_server = self.sender_to_server.clone();
+            // One task per offer, so a slow ICE gathering doesn't hold up other phones.
+            tokio::spawn(async move {
+                let answer = match webrtc_util
+                    .start_peer_connection(offer.data, sender_to_game, sender_data_channel, socket_id)
+                    .await
+                {
+                    Ok(peer_connection) => webrtc_util.create_answer(&peer_connection).await,
+                    Err(err) => Err(err),
+                };
+                let answer = match answer {
+                    Ok(answer) => answer,
+                    Err(err) => {
+                        error!("Failed to answer offer {}: {err:#}", offer.id);
+                        return;
+                    }
+                };
                 debug!("Received an answer in players_connector.");
                 let answer = MessageToServer::SdpAnswer(SdpMessage {
                     data: encode(&answer),
@@ -207,11 +214,11 @@ impl PlayersConnector {
                 });
 
                 debug!("Try to send the answer back to the server_communicator.");
-                match self.sender_to_server.unbounded_send(answer) {
+                match sender_to_server.unbounded_send(answer) {
                     Ok(()) => debug!("The message was successfully sent."),
                     Err(err) => debug!("failed to send message {}", err.to_string()),
                 }
-            }
+            });
         }
     }
 }

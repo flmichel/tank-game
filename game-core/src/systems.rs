@@ -1,4 +1,4 @@
-use specs::{Entities, Entity, Join, ReadStorage, System, WriteExpect, WriteStorage};
+use specs::{Entities, Entity, Join, LendJoin, System, WriteExpect, WriteStorage};
 use tracing::{debug, error, trace, warn};
 
 use crate::{
@@ -11,26 +11,30 @@ use crate::{
 pub struct RetrievePlayerForInputs;
 
 impl<'a> System<'a> for RetrievePlayerForInputs {
-    type SystemData = (
-        Entities<'a>,
-        ReadStorage<'a, PlayerInput>,
-        WriteStorage<'a, Player>,
-    );
+    type SystemData = (WriteExpect<'a, Vec<PlayerInput>>, WriteStorage<'a, Player>);
 
-    fn run(&mut self, (entities, player_inputs, mut players): Self::SystemData) {
-        for (entity, input) in (&entities, &player_inputs).join() {
+    fn run(&mut self, (mut player_inputs, mut players): Self::SystemData) {
+        for input in player_inputs.drain(..) {
             let player = self.retrieve_player_from_socket(&mut players, input.socket_id);
             trace!("Player inputs: {:?}", input);
 
-            // Update the players next input
-            if let Some(player) = player {
-                // Perform action if `option_value` is `Some`
-                player.next_input = input.remote_input.clone();
-            } else {
+            let Some(player) = player else {
                 warn!("No player found with socket id \"{}\"", input.socket_id);
+                continue;
+            };
+            match input.remote_input {
+                // The stick state is unreliable and unordered: drop states older than the applied one
+                RemoteInput::Sticks(sticks) if sticks.seq > player.input.sticks.seq => {
+                    player.input.sticks = sticks;
+                }
+                RemoteInput::Sticks(sticks) => trace!("Ignoring stale stick state {}", sticks.seq),
+                RemoteInput::GameInput(GameInput::Shoot(direction)) => {
+                    player.input.shoot = Some(direction);
+                }
+                RemoteInput::ConfigurationInput(configuration_input) => {
+                    player.input.configuration.push(configuration_input);
+                }
             }
-            // delete the entity
-            entities.delete(entity).expect("Failed to delete entity");
         }
     }
 }
@@ -75,7 +79,7 @@ impl<'a> System<'a> for HandleInputs {
             Phase::InGame => {
                 let (players, movements) = self.handle_game_inputs(players, movements);
                 self.update_game(
-                    entities, players, bullet, circles, movements, positions, state,
+                    entities, players, bullet, circles, movements, positions, state, outbox,
                 );
             }
         }
@@ -94,31 +98,37 @@ impl HandleInputs {
         mut outbox: WriteExpect<'a, Outbox>,
     ) {
         for player in (&mut players).join() {
-            match &player.next_input {
-                RemoteInput::GameInput(_) => {
-                    debug!("Game input is not allowed: Game hasn't started yet.")
-                }
-                RemoteInput::ConfigurationInput(ConfigurationInput::NotReady) => {
-                    player.status = ReadyStatus::NotReady;
-                }
-                RemoteInput::ConfigurationInput(ConfigurationInput::Ready) => {
-                    player.status = ReadyStatus::Ready;
-                }
-                RemoteInput::ConfigurationInput(ConfigurationInput::SetName(name)) => {
-                    if !name.is_empty() {
-                        player.name = name.to_string();
+            // Game inputs are not allowed before the game starts: drop them, so none is left over
+            let input = std::mem::take(&mut player.input);
+            player.input.sticks.seq = input.sticks.seq;
+            if input.shoot.is_some() {
+                debug!("Game input is not allowed: Game hasn't started yet.")
+            }
+
+            for configuration_input in input.configuration {
+                match configuration_input {
+                    ConfigurationInput::NotReady => player.status = ReadyStatus::NotReady,
+                    ConfigurationInput::Ready => player.status = ReadyStatus::Ready,
+                    ConfigurationInput::SetName(name) => {
+                        if !name.is_empty() {
+                            player.name = name;
+                        }
                     }
+                    ConfigurationInput::PlayerId(_) => {}
                 }
-                RemoteInput::NoInput
-                | RemoteInput::ConfigurationInput(ConfigurationInput::PlayerId(_)) => {}
             }
         }
 
         if self.can_game_start(&players) {
             state.phase = Phase::InGame;
+            state.map.reset_spawns();
 
             for (player_entity, player) in (&entities, &mut players).join() {
                 player.status = ReadyStatus::NotReady;
+                player.is_alive = true;
+                player.is_winner = false;
+                player.aim = AimStatus::None;
+                player.shoot = ShootStatus::CanShoot;
                 outbox.0.push((player.socket_id, MessageToRemote::GameStart));
                 let spawn = state.map.get_spawn_block();
                 match spawn {
@@ -151,29 +161,28 @@ impl HandleInputs {
         mut movements: WriteStorage<'a, Movement>,
     ) -> (WriteStorage<'a, Player>, WriteStorage<'a, Movement>) {
         for (player, movement) in (&mut players, &mut movements).join() {
-            match player.next_input {
-                RemoteInput::GameInput(GameInput::Move(direction)) => {
-                    movement.set_player_direction(direction);
-                }
-                RemoteInput::GameInput(GameInput::Stop) => movement.stop(),
-                RemoteInput::GameInput(GameInput::Aim(direction)) => {
-                    player.aim = AimStatus::Aim(direction);
-                }
-                RemoteInput::GameInput(GameInput::Shoot) => {
-                    if player.shoot == ShootStatus::CanShoot {
-                        trace!("Player is gonna shoot");
-                        player.shoot = ShootStatus::Shooting;
-                    } else {
-                        player.aim = AimStatus::None;
-                    }
-                }
-                RemoteInput::ConfigurationInput(_) => {
-                    trace!("configuration input not allowed: game has started")
-                }
-                RemoteInput::NoInput => {}
+            if !player.input.configuration.is_empty() {
+                trace!("configuration input not allowed: game has started");
+                player.input.configuration.clear();
             }
 
-            player.next_input = RemoteInput::NoInput;
+            match player.input.sticks.movement {
+                Some(direction) => movement.set_player_direction(direction),
+                None => movement.stop(),
+            }
+            player.aim = match player.input.sticks.aim {
+                Some(direction) => AimStatus::Aim(direction),
+                None => AimStatus::None,
+            };
+            if let Some(direction) = player.input.shoot.take() {
+                if player.shoot == ShootStatus::CanShoot {
+                    trace!("Player is gonna shoot");
+                    player.aim = AimStatus::Aim(direction);
+                    player.shoot = ShootStatus::Shooting;
+                } else {
+                    player.aim = AimStatus::None;
+                }
+            }
         }
 
         (players, movements)
@@ -188,19 +197,31 @@ impl HandleInputs {
         mut movements: WriteStorage<'a, Movement>,
         mut positions: WriteStorage<'a, Position>,
         mut state: WriteExpect<'a, State>,
+        mut outbox: WriteExpect<'a, Outbox>,
     ) {
-        // Wall detection
-        for (circle, movement, position) in (&mut circles, &mut movements, &mut positions).join() {
+        // Wall detection: players stop against walls, bullets are destroyed
+        for (entity, circle, movement, position, bullet) in (
+            &entities,
+            &mut circles,
+            &mut movements,
+            &mut positions,
+            (&bullets).maybe(),
+        )
+            .join()
+        {
             let next_position = position.next(movement);
             if !has_wall_collision(&next_position, circle, &state.map) {
                 position.update(&next_position);
+            } else if bullet.is_some() {
+                entities.delete(entity).expect("Failed to delete entity");
             }
         }
 
-        // Bullet - Player collision
+        // Bullet - Player collision: the player dies, the bullet is destroyed
         for (player_circle, player_position, player) in (&circles, &positions, &mut players).join()
         {
-            for (bullet_circle, bullet_position, bullet) in (&circles, &positions, &bullets).join()
+            for (bullet_entity, bullet_circle, bullet_position, bullet) in
+                (&entities, &circles, &positions, &bullets).join()
             {
                 if has_bullet_player_collision(
                     player_position,
@@ -210,29 +231,30 @@ impl HandleInputs {
                 ) && bullet.owner_id != player.id
                 {
                     player.is_alive = false;
+                    entities.delete(bullet_entity).expect("Failed to delete entity");
                 }
             }
         }
 
-        // End the game if one player is alive
-        let mut alive_players_count = 0;
-        let mut winner: Option<&mut Player> = None;
-        (&mut players).join().for_each(|player| {
-            if player.is_alive {
-                alive_players_count += 1;
-                player.is_winner = true;
-                winner = Some(player);
-
-                if alive_players_count > 1 {
-                    winner = None;
-                    return;
-                }
+        // Dead players leave the board: they can no longer move, shoot or be hit
+        for (entity, player) in (&entities, &players).join() {
+            if !player.is_alive {
+                remove_from_board(entity, &mut positions, &mut movements, &mut circles);
             }
-        });
+        }
 
-        if let Some(player) = winner {
-            player.is_winner = true;
+        // End the round when at most one player is left on the board (none left is a draw)
+        if (&players, &positions).join().count() <= 1 {
+            for (entity, player) in (&entities, &mut players).join() {
+                player.is_winner = positions.contains(entity);
+                remove_from_board(entity, &mut positions, &mut movements, &mut circles);
+                outbox.0.push((player.socket_id, MessageToRemote::GameOver));
+            }
+            for (entity, _) in (&entities, &bullets).join() {
+                entities.delete(entity).expect("Failed to delete entity");
+            }
             state.phase = Phase::BeforeNextGame;
+            return;
         }
 
         // Generate new bullets
@@ -283,16 +305,23 @@ fn get_position_block_center(block: Block) -> Position {
 
 fn has_wall_collision(position: &Position, circle: &Circle, map: &Map) -> bool {
     for hit_point in circle.hit_points.iter() {
-        let block = &Block(
-            (position.x + hit_point.x) as u8,
-            (position.y + hit_point.y) as u8,
-        );
-        if map.is_wall(block) {
+        if map.is_wall(position.x + hit_point.x, position.y + hit_point.y) {
             return true;
         }
     }
 
     false
+}
+
+fn remove_from_board(
+    entity: Entity,
+    positions: &mut WriteStorage<Position>,
+    movements: &mut WriteStorage<Movement>,
+    circles: &mut WriteStorage<Circle>,
+) {
+    positions.remove(entity);
+    movements.remove(entity);
+    circles.remove(entity);
 }
 
 fn has_bullet_player_collision(
@@ -331,6 +360,8 @@ impl<'a> System<'a> for SynchronizePlayerToRemote {
         for (entity, synchronize_player) in (&entities, &synchronize_players).join() {
             if let Some(player) = retrieve_player_from_id(&mut players, &synchronize_player.player_id) {
                 player.socket_id = synchronize_player.socket_id;
+                // A new remote numbers its stick states from scratch
+                player.input = Default::default();
             } else {
                 let player_entity = entities.create();
 
