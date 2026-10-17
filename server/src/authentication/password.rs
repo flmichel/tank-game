@@ -1,16 +1,14 @@
 use argon2::{
-    password_hash::SaltString, Algorithm, Argon2, Params, PasswordHash, PasswordHasher,
-    PasswordVerifier, Version,
+    Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
 };
 
 pub fn hash_password(password: String) -> String {
-    let salt = SaltString::generate(&mut rand::thread_rng());
     let password_hash = Argon2::new(
         Algorithm::Argon2id,
         Version::V0x13,
         Params::new(15000, 2, 1, None).unwrap(),
     )
-    .hash_password(password.as_bytes(), &salt)
+    .hash_password(password.as_bytes())
     .unwrap()
     .to_string();
 

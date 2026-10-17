@@ -1,4 +1,3 @@
-use rand::Rng;
 use std::collections::HashSet;
 
 use crate::error::{Error, ErrorKind::*};
@@ -78,7 +77,7 @@ impl Map {
         if range.is_empty() {
             return Err(Error::new(NoSpawnAvailable, "no more spawns available"));
         }
-        let random_index = rand::thread_rng().gen_range(range);
+        let random_index = rand::random_range(range);
         Ok(self.available_spawns.remove(random_index))
     }
 
