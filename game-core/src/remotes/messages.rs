@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::balance::Upgrade;
+
 #[derive(Debug)]
 pub struct PlayerInput {
     pub socket_id: u32,
@@ -37,5 +39,7 @@ pub enum ConfigurationInput {
     Ready,
     NotReady,
     SetName(String),
+    /// `{"buy":"bullet-speed"}`, honoured between rounds only
+    Buy(Upgrade),
     PlayerId(String),
 }

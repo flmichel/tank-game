@@ -1,3 +1,5 @@
+pub mod balance;
+pub mod bot;
 pub mod components;
 pub mod error;
 pub mod game;

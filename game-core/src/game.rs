@@ -5,15 +5,22 @@ use specs_derive::Component;
 use tracing::debug;
 
 use crate::{
-    components::{Bullet, Circle, Movement, Player, Position},
+    balance::{Loadout, Upgrade},
+    bot::{BotKind, BOT_ID_PREFIX},
+    components::{Bullet, Circle, Movement, Player, Position, Stats},
     remotes::{ConfigurationInput, PlayerInput, RemoteInput},
     render::{self, Renderer},
     room_code::RoomCode,
     state::{
         game_state::{Phase, State},
+        match_state::Match,
         Map,
     },
-    systems::{HandleInputs, RetrievePlayerForInputs, SynchronizePlayerToRemote},
+    systems::{
+        ApplyInputs, ApplyPurchases, AwardMoney, BotThink, Lobby, MoveAndCollideWalls,
+        ResolveHits, ResolveRound, RetrievePlayerForInputs, Shoot, Step,
+        SynchronizePlayerToRemote, TickShotCooldown,
+    },
 };
 
 // A step costs ~1 µs, so a high rate is free and keeps the wait for the next step under 9 ms
@@ -27,6 +34,8 @@ pub enum MessageToGame {
     PlayerInput(PlayerInput),
     RoomId(RoomId),
     SynchronizePlayer(SynchronizePlayer),
+    /// Adds a bot player, which needs no remote and readies itself up.
+    AddBot(BotKind),
 }
 
 impl MessageToGame {
@@ -68,10 +77,21 @@ pub struct Game {
     dispatcher: Dispatcher<'static, 'static>,
     inbox: VecDeque<MessageToGame>,
     lag: f64,
+    bots_added: u32,
+    /// Mixed into each bot's generator, so bots differ between matches as well as from
+    /// each other.
+    seed: u64,
 }
 
 impl Game {
     pub fn new(map: &str, resolution: (u32, u32)) -> Self {
+        Game::new_with_seed(map, resolution, rand::random())
+    }
+
+    /// Same game, with spawn draws that repeat for a given seed. Bot decisions are already
+    /// reproducible, so a match of bots alone replays exactly, which is what a balance
+    /// sweep needs.
+    pub fn new_with_seed(map: &str, resolution: (u32, u32), seed: u64) -> Self {
         let mut world = World::new();
         world.register::<RoomId>();
         world.register::<SynchronizePlayer>();
@@ -79,19 +99,24 @@ impl Game {
         world.register::<Movement>();
         world.register::<Circle>();
         world.register::<Player>();
+        world.register::<Stats>();
         world.register::<Bullet>();
 
         world.insert(State {
             room_code: RoomCode::new("Error, the game could not connect to server".to_owned()),
             phase: Phase::BeforeNextGame,
             number_of_ready_players: 0,
-            map: Map::parse(map, resolution),
+            map: Map::parse_with_seed(map, resolution, seed),
             resolution,
         });
+        world.insert(Match::default());
         world.insert(Outbox::default());
         world.insert(Vec::<PlayerInput>::new());
+        world.insert(Step::new(Phase::BeforeNextGame));
 
-        // A remote's player must exist before its inputs are applied
+        // One job per system, in order: a player must exist before its inputs are
+        // folded in, inputs before they are applied, movement before collisions, and the
+        // round must be resolved before anything spawns into the next step.
         let dispatcher = DispatcherBuilder::new()
             .with(SynchronizePlayerToRemote, "SynchronizePlayerToRemote", &[])
             .with(
@@ -99,13 +124,24 @@ impl Game {
                 "RetrievePlayerForInputs",
                 &["SynchronizePlayerToRemote"],
             )
-            .with(HandleInputs, "HandleInputs", &["RetrievePlayerForInputs"])
+            .with(BotThink, "BotThink", &["RetrievePlayerForInputs"])
+            .with(ApplyPurchases, "ApplyPurchases", &["BotThink"])
+            .with(Lobby, "Lobby", &["ApplyPurchases"])
+            .with(ApplyInputs, "ApplyInputs", &["Lobby"])
+            .with(MoveAndCollideWalls, "MoveAndCollideWalls", &["ApplyInputs"])
+            .with(ResolveHits, "ResolveHits", &["MoveAndCollideWalls"])
+            .with(ResolveRound, "ResolveRound", &["ResolveHits"])
+            .with(AwardMoney, "AwardMoney", &["ResolveRound"])
+            .with(Shoot, "Shoot", &["AwardMoney"])
+            .with(TickShotCooldown, "TickShotCooldown", &["Shoot"])
             .build();
 
         Game {
             world,
             dispatcher,
             inbox: VecDeque::new(),
+            bots_added: 0,
+            seed,
             lag: 0.,
         }
     }
@@ -143,13 +179,65 @@ impl Game {
                 MessageToGame::PlayerInput(input) => {
                     self.world.write_resource::<Vec<PlayerInput>>().push(input);
                 }
+                MessageToGame::AddBot(kind) => {
+                    self.bots_added += 1;
+                    let id = format!("{}{}", BOT_ID_PREFIX, self.bots_added);
+                    debug!("Adding {} bot \"{}\".", kind.label(), id);
+                    let player = Player::new_bot(id, kind, bot_seed(self.seed, self.bots_added));
+                    self.world.create_entity().with(player).build();
+                }
                 MessageToGame::SynchronizePlayer(synchronize_player) => {
                     self.world.create_entity().with(synchronize_player).build();
                 }
             }
         }
 
+        // Every system in this step agrees on the phase, even when one of them changes it
+        let phase = self.world.read_resource::<State>().phase;
+        *self.world.write_resource::<Step>() = Step::new(phase);
+
         self.dispatcher.dispatch(&self.world);
         self.world.maintain();
+    }
+}
+
+/// Seeds each bot from the match seed and its own number, so bot decisions are reproducible
+/// for a given match and no two bots run in lockstep.
+fn bot_seed(match_seed: u64, bot_number: u32) -> u64 {
+    // Multiplied, not XOR-ed: neighbouring bot numbers must not produce seeds that differ
+    // in one bit, or two bots wander and fire in lockstep
+    0x9E37_79B9_7F4A_7C15_u64
+        .wrapping_mul(bot_number as u64 + 1)
+        .wrapping_add(match_seed)
+}
+
+impl Game {
+    /// Money `player_id` can spend between rounds.
+    pub fn wallet(&self, player_id: &str) -> u32 {
+        self.world.read_resource::<Match>().wallet(player_id)
+    }
+
+    /// Rounds `player_id` has won in this match.
+    pub fn round_wins(&self, player_id: &str) -> u32 {
+        self.world.read_resource::<Match>().round_wins(player_id)
+    }
+
+    /// What `player_id` has bought.
+    pub fn loadout(&self, player_id: &str) -> Loadout {
+        self.world.read_resource::<Match>().loadout(player_id)
+    }
+
+    /// Rounds completed in this match.
+    pub fn rounds_played(&self) -> u32 {
+        self.world.read_resource::<Match>().round
+    }
+}
+
+impl Game {
+    /// Puts an upgrade on a player without charging for it, for harnesses and tests.
+    pub fn grant_upgrade(&mut self, player_id: &str, upgrade: Upgrade) {
+        self.world
+            .write_resource::<Match>()
+            .grant(player_id, upgrade);
     }
 }

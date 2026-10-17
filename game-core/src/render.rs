@@ -3,6 +3,7 @@ use specs::{Join, World, WorldExt};
 use crate::{
     components::*,
     state::{
+        match_state::Match,
         game_state::{Phase, State},
         BlockKind, Map,
     },
@@ -83,7 +84,14 @@ fn render_before_game(world: &World, state: &State, renderer: &mut impl Renderer
     // The code is as wide as the room's URL makes it, and a phone cannot scan one drawn over
     let roster_left = 2 * QR_MARGIN + state.room_code.size(QR_SQUARE_SIZE) as i32;
     let players = world.read_storage::<Player>();
-    render_roster(&players.join().collect::<Vec<_>>(), roster_left, state.resolution, renderer);
+    let match_state = world.read_resource::<Match>();
+    render_roster(
+        &players.join().collect::<Vec<_>>(),
+        &match_state,
+        roster_left,
+        state.resolution,
+        renderer,
+    );
 }
 
 // The lobby roster sits to the right of the QR code. A row is 60 px while that fits, then rows
@@ -96,6 +104,7 @@ const TEXT_HEIGHT: i32 = 24;
 
 fn render_roster(
     players: &[&Player],
+    match_state: &Match,
     left: i32,
     resolution: (u32, u32),
     renderer: &mut impl Renderer,
@@ -123,8 +132,15 @@ fn render_roster(
         renderer.draw_sprite(Sprite::PlayerFace, Rect::new(x, y, icon, icon));
         renderer.fill_rect(Rect::new(x + icon as i32 + gap, y, icon, icon), status_color);
         if !player.name.is_empty() {
+            // Between rounds the roster is also the buy screen: what each tank is worth
+            let label = format!(
+                "{} ${} w{}",
+                player.name,
+                match_state.wallet(&player.id),
+                match_state.round_wins(&player.id)
+            );
             let text_y = y + (icon as i32 - TEXT_HEIGHT).max(0) / 2;
-            renderer.draw_text(&player.name, x + 2 * (icon as i32 + gap), text_y, Color::RED);
+            renderer.draw_text(&label, x + 2 * (icon as i32 + gap), text_y, Color::RED);
         }
     }
 }
@@ -138,6 +154,8 @@ fn render_game(world: &World, state: &State, renderer: &mut impl Renderer) {
     let positions = world.read_storage::<Position>();
     let circles = world.read_storage::<Circle>();
     let players = world.read_storage::<Player>();
+
+    render_scoreboard(&players, world, renderer);
 
     // Circles are either players or bullets
     for (entity, position, circle) in (&entities, &positions, &circles).join() {
@@ -194,5 +212,35 @@ fn render_aiming_line(renderer: &mut impl Renderer, position: &Position, aim: &A
             ((position.y + direction.sin() * AIMING_LINE_LENGTH) * block_size) as i32,
         );
         renderer.draw_line(start, end, Color::GREEN);
+    }
+}
+
+// The scoreboard sits in the top left corner of the round, over the map. Text only: the shells
+// draw it 24 px tall and the tests count sprites.
+const SCOREBOARD_LEFT: i32 = 10;
+const SCOREBOARD_TOP: i32 = 10;
+const SCOREBOARD_ROW_HEIGHT: i32 = TEXT_HEIGHT + 4;
+
+/// Money and rounds won, so a player can see what the next buy phase affords.
+fn render_scoreboard(
+    players: &specs::ReadStorage<Player>,
+    world: &World,
+    renderer: &mut impl Renderer,
+) {
+    let match_state = world.read_resource::<Match>();
+
+    for (row, player) in players.join().enumerate() {
+        let line = format!(
+            "{} ${} w{}",
+            player.name,
+            match_state.wallet(&player.id),
+            match_state.round_wins(&player.id)
+        );
+        renderer.draw_text(
+            &line,
+            SCOREBOARD_LEFT,
+            SCOREBOARD_TOP + row as i32 * SCOREBOARD_ROW_HEIGHT,
+            Color::BLACK,
+        );
     }
 }
