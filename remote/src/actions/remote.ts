@@ -5,20 +5,46 @@ import { Action } from "./actions";
 let inputs: RTCDataChannel | null = null;
 let seq = 0;
 
-// The stick state goes out on every change, plus a 60 Hz resend: each message is the full state,
-// so a lost one (even a release) is replaced by the next within ~17 ms. Pings measure the network.
+// A game step is 1/120 s, so sending faster than that buys nothing and costs airtime: with 16
+// phones on one router it is the phones' sends that saturate the Wi-Fi, not the game.
+const MIN_SEND_INTERVAL_MS = 1000 / 120;
+// Each message is the full stick state, so a lost one only has to be replaced while the sticks are
+// still: a moving stick's next change already replaces it.
+const IDLE_RESEND_INTERVAL_MS = 1000 / 60;
+// Four copies of a resting state in ~50 ms; losing all four is unlikely, and the phone then goes
+// quiet instead of repeating itself at 60 Hz for as long as the player holds still.
+const IDLE_RESENDS = 3;
+
+let lastSent: Sticks | null = null;
+let lastSendTime = 0;
+let lastPhase: GamePhase | null = null;
+let idleResendsLeft = 0;
+let trailingSend: number | null = null;
+
+interface Sticks {
+  move: number | null;
+  aim: number | null;
+}
+
+// The stick state goes out on every change, capped at 120 Hz, and is repeated a few times while
+// the sticks are still. Pings measure the network.
 export function streamSticks(channel: RTCDataChannel) {
   let timers: number[] = [];
   channel.onopen = () => {
     inputs = channel;
+    lastSent = null; // a new channel knows nothing about this phone's sticks
     timers = [
-      window.setInterval(sendSticks, 1000 / 60),
+      window.setInterval(resendSticksWhileIdle, IDLE_RESEND_INTERVAL_MS),
       window.setInterval(() => channel.send(JSON.stringify({ ping: performance.now() })), 1000),
     ];
   };
   channel.onclose = () => {
     inputs = null;
     timers.forEach(clearInterval);
+    if (trailingSend !== null) {
+      clearTimeout(trailingSend);
+      trailingSend = null;
+    }
   };
   channel.onmessage = (event) => {
     const { pong } = JSON.parse(event.data);
@@ -29,16 +55,55 @@ export function streamSticks(channel: RTCDataChannel) {
   };
 }
 
+// Called on every stick change. A change that falls inside the cap is not dropped: one trailing
+// send carries the newest state as soon as the cap allows.
 function sendSticks() {
-  if (inputs?.readyState !== "open" || state.game.state.phase !== GamePhase.InGame) return;
+  if (!canSend()) return;
+  const sticks = currentSticks();
+  if (lastSent && sticks.move === lastSent.move && sticks.aim === lastSent.aim) return;
+
+  const wait = lastSendTime + MIN_SEND_INTERVAL_MS - performance.now();
+  if (wait > 0) {
+    if (trailingSend === null) {
+      trailingSend = window.setTimeout(() => {
+        trailingSend = null;
+        sendSticks();
+      }, wait);
+    }
+    return;
+  }
+
+  send(sticks);
+  idleResendsLeft = IDLE_RESENDS;
+}
+
+function resendSticksWhileIdle() {
+  if (!canSend() || idleResendsLeft === 0) return;
+  if (performance.now() - lastSendTime < IDLE_RESEND_INTERVAL_MS) return; // the sticks are moving
+  idleResendsLeft -= 1;
+  send(currentSticks());
+}
+
+function canSend(): boolean {
+  const phase = state.game.state.phase;
+  if (phase !== lastPhase) {
+    lastPhase = phase;
+    // A round starts with the game knowing nothing about this phone, even if a stick is held down
+    lastSent = null;
+    idleResendsLeft = IDLE_RESENDS;
+  }
+  return inputs?.readyState === "open" && phase === GamePhase.InGame;
+}
+
+function currentSticks(): Sticks {
   const { leftController, rightController } = state.remote;
-  inputs.send(
-    JSON.stringify({
-      seq: ++seq,
-      move: leftController.direction,
-      aim: rightController.direction,
-    })
-  );
+  return { move: leftController.direction, aim: rightController.direction };
+}
+
+function send(sticks: Sticks) {
+  lastSent = sticks;
+  lastSendTime = performance.now();
+  inputs!.send(JSON.stringify({ seq: ++seq, move: sticks.move, aim: sticks.aim }));
 }
 
 export class SetControllerCenter implements Action {

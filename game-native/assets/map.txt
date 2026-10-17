@@ -1,9 +1,9 @@
-       s 
-      xxxx
-  sx    s   xs
- xxx   xx   xxx
-  s    xx    s
- xxx   xx   xxx
-  sx   s    xs
-      xxxx
-        s 
+    s  s   s    
+      xxxx      
+  sx    s   xs  
+ xxx   xx   xxx 
+  s  s xx s  s  
+ xxx   xx   xxx 
+  sx   s    xs  
+      xxxx      
+    s   s  s    

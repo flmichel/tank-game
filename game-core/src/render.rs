@@ -52,6 +52,7 @@ pub trait Renderer {
     fn fill_rect(&mut self, rect: Rect, color: Color);
     fn draw_line(&mut self, from: (i32, i32), to: (i32, i32), color: Color);
     fn draw_sprite(&mut self, sprite: Sprite, rect: Rect);
+    /// Draws `text` with (x, y) as the top left of its box, 24 px tall in every shell.
     fn draw_text(&mut self, text: &str, x: i32, y: i32, color: Color);
 }
 
@@ -66,25 +67,65 @@ pub fn render(world: &World, renderer: &mut impl Renderer) {
     }
 }
 
+const QR_SQUARE_SIZE: usize = 10;
+const QR_MARGIN: i32 = 10;
+
 fn render_before_game(world: &World, state: &State, renderer: &mut impl Renderer) {
     renderer.clear(Color::rgb(173, 216, 230));
 
-    for (square, color) in state.room_code.get_qr_code_squares(10) {
-        renderer.fill_rect(Rect::new(square.x + 10, square.y + 10, square.w, square.h), color);
+    for (square, color) in state.room_code.get_qr_code_squares(QR_SQUARE_SIZE) {
+        renderer.fill_rect(
+            Rect::new(square.x + QR_MARGIN, square.y + QR_MARGIN, square.w, square.h),
+            color,
+        );
     }
 
-    let mut y = 200;
-    for player in world.read_storage::<Player>().join() {
+    // The code is as wide as the room's URL makes it, and a phone cannot scan one drawn over
+    let roster_left = 2 * QR_MARGIN + state.room_code.size(QR_SQUARE_SIZE) as i32;
+    let players = world.read_storage::<Player>();
+    render_roster(&players.join().collect::<Vec<_>>(), roster_left, state.resolution, renderer);
+}
+
+// The lobby roster sits to the right of the QR code. A row is 60 px while that fits, then rows
+// shrink and wrap into further columns, so a full game of players is still all on screen.
+const ROSTER_TOP: i32 = 20;
+const MAX_ROW_HEIGHT: i32 = 60;
+// Both shells draw text 24 px tall and the roster cannot scale it, so a row never goes under this.
+const MIN_ROW_HEIGHT: i32 = 36;
+const TEXT_HEIGHT: i32 = 24;
+
+fn render_roster(
+    players: &[&Player],
+    left: i32,
+    resolution: (u32, u32),
+    renderer: &mut impl Renderer,
+) {
+    if players.is_empty() {
+        return;
+    }
+
+    let height = (resolution.1 as i32 - ROSTER_TOP).max(MIN_ROW_HEIGHT);
+    let rows_that_fit = (height / MIN_ROW_HEIGHT).max(1) as usize;
+    let columns = players.len().div_ceil(rows_that_fit);
+    let rows = players.len().div_ceil(columns);
+    let row_height = (height / rows as i32).min(MAX_ROW_HEIGHT);
+    let column_width = (resolution.0 as i32 - left).max(0) / columns as i32;
+
+    let icon = (row_height * 2 / 3) as u32;
+    let gap = icon as i32 / 8;
+    for (index, player) in players.iter().enumerate() {
+        let x = left + (index / rows) as i32 * column_width;
+        let y = ROSTER_TOP + (index % rows) as i32 * row_height;
         let status_color = match player.status {
             ReadyStatus::Ready => Color::GREEN,
             ReadyStatus::NotReady => Color::RED,
         };
-        renderer.fill_rect(Rect::new(500, y, 40, 40), status_color);
-        renderer.draw_sprite(Sprite::PlayerFace, Rect::new(460, y, 40, 40));
+        renderer.draw_sprite(Sprite::PlayerFace, Rect::new(x, y, icon, icon));
+        renderer.fill_rect(Rect::new(x + icon as i32 + gap, y, icon, icon), status_color);
         if !player.name.is_empty() {
-            renderer.draw_text(&player.name, 560, y + 10, Color::RED);
+            let text_y = y + (icon as i32 - TEXT_HEIGHT).max(0) / 2;
+            renderer.draw_text(&player.name, x + 2 * (icon as i32 + gap), text_y, Color::RED);
         }
-        y += 60;
     }
 }
 

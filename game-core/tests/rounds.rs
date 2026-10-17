@@ -72,7 +72,9 @@ fn a_round_ends_on_a_hit_and_the_next_one_starts_clean() {
     let mut sprites = Sprites::default();
     game.render(&mut sprites);
     assert_eq!(sprites.missiles, 0, "no bullet carries over to the next round");
-    let mut spawn_columns: Vec<i32> = sprites.tanks.iter().map(|rect| rect.x / 100).collect();
+    // The map file sets the scale: 3 blocks across a 1600 px window
+    let block_size = 1600 / 3;
+    let mut spawn_columns: Vec<i32> = sprites.tanks.iter().map(|rect| rect.x / block_size).collect();
     spawn_columns.sort();
     assert_eq!(spawn_columns, [0, 2], "both tanks are alive, on the map's two spawns");
 }

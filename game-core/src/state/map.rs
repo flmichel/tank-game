@@ -57,11 +57,14 @@ impl Map {
 
         let available_spawns = spawns.clone();
 
-        let dimension = Dimensions(16, 9);
-        let block_size = resolution.0 / dimension.0 as u32;
+        // The map file is the only source of its size: a row shorter than the widest one would
+        // otherwise hold blocks that render as ground but count as wall.
+        let width = block_matrix.iter().map(Vec::len).max().unwrap_or(0) as u8;
+        let dimensions = Dimensions(width, block_matrix.len() as u8);
+        let block_size = resolution.0 / width.max(1) as u32;
 
         Map {
-            dimensions: Dimensions(16, 9),
+            dimensions,
             wall_set,
             spawns,
             block_matrix,
