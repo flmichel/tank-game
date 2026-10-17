@@ -192,7 +192,7 @@ async fn answer_offer(
     description.set_sdp(&js_sys::Reflect::get(&answer, &"sdp".into())?.as_string().unwrap_or_default());
     JsFuture::from(peer_connection.set_local_description(&description)).await?;
 
-    // The answer goes back in a single signaling message, so wait for every ICE candidate
+    // The answer goes back in a single signaling message, so it has to carry the candidates
     wait_for_ice_gathering(&peer_connection).await?;
 
     let local = peer_connection.local_description().ok_or("no local description")?;
@@ -202,12 +202,19 @@ async fn answer_offer(
     websocket.send_with_str(&serde_json::to_string(&message).map_err(|err| err.to_string())?)
 }
 
+// Gathering has to be good enough, not complete: an unreachable STUN server keeps the browser
+// gathering for tens of seconds, long past the server's answer timeout, so a phone never joins.
+// The candidates found by then go in the answer, and host candidates alone connect a phone on the
+// same network. Where STUN answers, gathering completes well inside this and nothing is lost.
+const ICE_GATHERING_TIMEOUT_MS: i32 = 1_000;
+
 async fn wait_for_ice_gathering(peer_connection: &RtcPeerConnection) -> Result<(), JsValue> {
     if peer_connection.ice_gathering_state() == RtcIceGatheringState::Complete {
         return Ok(());
     }
     let promise = js_sys::Promise::new(&mut |resolve, _reject| {
         let watched = peer_connection.clone();
+        let resolve_on_timeout = resolve.clone();
         let on_change = Closure::<dyn FnMut()>::new(move || {
             if watched.ice_gathering_state() == RtcIceGatheringState::Complete {
                 let _ = resolve.call0(&JsValue::NULL);
@@ -215,6 +222,18 @@ async fn wait_for_ice_gathering(peer_connection: &RtcPeerConnection) -> Result<(
         });
         peer_connection.set_onicegatheringstatechange(Some(on_change.as_ref().unchecked_ref()));
         on_change.forget();
+
+        // Resolving a promise twice is a no-op, so whichever comes first wins
+        let give_up = Closure::<dyn FnMut()>::new(move || {
+            let _ = resolve_on_timeout.call0(&JsValue::NULL);
+        });
+        if let Some(window) = web_sys::window() {
+            let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+                give_up.as_ref().unchecked_ref(),
+                ICE_GATHERING_TIMEOUT_MS,
+            );
+        }
+        give_up.forget();
     });
     JsFuture::from(promise).await.map(|_| ())
 }
