@@ -9,7 +9,8 @@
 const puppeteer = require("puppeteer-core");
 const { performance } = require("node:perf_hooks");
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+// Chrome is wherever the machine keeps it: CHROME overrides the macOS default.
+const CHROME = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const GAME_URL = "http://localhost:8081/?server=ws://localhost:5050/ws";
 const REMOTE_URL = "http://localhost:8080/?room-id=";
 const ARGS = [
@@ -106,6 +107,9 @@ async function openGame() {
   return { browser, page, roomId: await roomId };
 }
 
+const READY_BUTTON = `document.querySelector("root-view")?.shadowRoot?.querySelector("game-view")?.shadowRoot
+  ?.querySelector("game-configuration")?.shadowRoot?.querySelector("button")`;
+
 async function joinPhone(browser, roomId, index, profile) {
   const context = await browser.createBrowserContext(); // own localStorage, so its own player id
   const page = await context.newPage();
@@ -118,20 +122,24 @@ async function joinPhone(browser, roomId, index, profile) {
   await page.goto(REMOTE_URL + roomId);
   await opened;
   const joinMs = now() - started;
-  await page.locator('pierce/input[placeholder="Enter username"]').fill(`p${index}`);
-  const readyButton = `document.querySelector("root-view")?.shadowRoot?.querySelector("game-view")?.shadowRoot
-    ?.querySelector("game-configuration")?.shadowRoot?.querySelector("button")`;
+  return { page, joinMs, cdp: await page.createCDPSession() };
+}
+
+// Names and readies one phone. The game starts a round as soon as every player it already has is
+// ready, and a round start resets the others to not ready, so no phone may be readied before all
+// of them are in the lobby.
+async function readyPhone(phone, index) {
+  await phone.page.locator('pierce/input[placeholder="Enter username"]').fill(`p${index}`);
   // Done once the button says Ready, or is gone because the last player's ready started the game
-  for (let attempt = 0; (await page.evaluate(`${readyButton}?.textContent.trim()`)) === "Not Ready"; attempt++) {
+  for (let attempt = 0; (await phone.page.evaluate(`${READY_BUTTON}?.textContent.trim()`)) === "Not Ready"; attempt++) {
     if (attempt === 10) throw new Error(`phone ${index} could not get ready`);
     await sleep(100); // let the name's re-render settle, or the click can be lost
-    await page.evaluate(`${readyButton}.click()`);
+    await phone.page.evaluate(`${READY_BUTTON}?.click()`);
     // A second click before this one shows would toggle back to not ready
-    await page
-      .waitForFunction(`${readyButton}?.textContent.trim() !== "Not Ready"`, { timeout: 2000 })
+    await phone.page
+      .waitForFunction(`${READY_BUTTON}?.textContent.trim() !== "Not Ready"`, { timeout: 2000 })
       .catch(() => {});
   }
-  return { page, joinMs, cdp: await page.createCDPSession() };
 }
 
 async function stickCenter(page, id) {
@@ -203,6 +211,7 @@ async function measure(game, phonesBrowser, profileName, profile, players) {
   const phones = await Promise.all(
     Array.from({ length: players }, (_, index) => joinPhone(phonesBrowser, game.roomId, index + 1, profile))
   );
+  await Promise.all(phones.map((phone, index) => readyPhone(phone, index + 1)));
   await Promise.all(phones.map((phone) => stickCenter(phone.page, "action"))); // everyone is in game
 
   const [aimer, ...others] = phones;
