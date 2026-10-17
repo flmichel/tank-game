@@ -1,5 +1,5 @@
 use futures_channel::mpsc::unbounded;
-use game_core::Game;
+use game_core::{bot::BotKind, Game, MessageToGame};
 use game_native::{
     players_connector::PlayersConnector, renderer::SdlRenderer,
     server_communicator::ServerCommunicator, startup::setup_logger,
@@ -27,11 +27,13 @@ struct Assets {
 #[tokio::main]
 async fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() > 1 {
+    if args.len() > 1 && !args[1].starts_with("--") {
         setup_logger(&args[1]);
     } else {
         setup_logger("info");
     }
+
+    let bots = parse_bots(&args);
 
     let (sender_to_server, receiver_server) = unbounded();
     let (sender_to_player_connector, receiver_player_connector) = unbounded();
@@ -58,6 +60,11 @@ async fn main() -> Result<(), String> {
 
     let map = std::fs::read_to_string("assets/map.txt").expect("Failed to load map");
     let mut game = Game::new(&map, assets.canvas.window().size());
+
+    // Bots need no remote: with one the game is playable, and testable, alone
+    for _ in 0..bots.0 {
+        game.handle(MessageToGame::AddBot(bots.1));
+    }
 
     let mut event_pump = assets.sdl_context.event_pump()?;
 
@@ -128,6 +135,26 @@ async fn main() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// `--bots <count>[:<kind>]`, kind being dummy (the default), wanderer, or hunter.
+fn parse_bots(args: &[String]) -> (u32, BotKind) {
+    let Some(value) = args.iter().position(|arg| arg == "--bots").and_then(|at| args.get(at + 1))
+    else {
+        return (0, BotKind::Dummy);
+    };
+
+    let (count, kind) = value.split_once(':').unwrap_or((value, "dummy"));
+    let count = count.parse().unwrap_or_else(|_| {
+        warn!("--bots {value}: not a bot count, starting without bots");
+        0
+    });
+    let kind = BotKind::parse(kind).unwrap_or_else(|| {
+        warn!("--bots {value}: unknown bot kind \"{kind}\", using dummy");
+        BotKind::Dummy
+    });
+
+    (count, kind)
 }
 
 fn load_font(ttf_context: &Sdl2TtfContext) -> Font {

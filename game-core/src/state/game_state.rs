@@ -10,6 +10,7 @@ pub struct State {
     pub resolution: (u32, u32),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Phase {
     BeforeNextGame,
     InGame,

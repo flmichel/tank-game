@@ -13,8 +13,15 @@
   - drawing: `Renderer` trait (clear / fill_rect / draw_line / draw_sprite / draw_text); text is
     24 px tall in every shell and (x, y) is its top left
   - time: `Game::tick(dt)` runs fixed 120 Hz steps (`STEPS_PER_SECOND`)
+  - step pipeline: `systems/mod.rs` documents the order; `systems::Step` carries the phase
+    snapshot and the round-ended flag, so every system in a step agrees on the phase
+  - rounds, money and upgrades: `state::Match` keyed by `Player::id` outlives rounds,
+    `balance.rs` holds every tunable number, `Stats` is written at spawn from the loadout
+  - bots: `MessageToGame::AddBot(BotKind)`; `BotThink` fills the same `Player::input` a
+    phone would, and bots have no socket so `Outbox` skips them
   - `game_core::protocol` holds the server signaling types and Ping/Pong
-- `game-native`: SDL2 + tokio + webrtc-rs shell; vsync-paced loop.
+- `game-native`: SDL2 + tokio + webrtc-rs shell; vsync-paced loop. `--bots <count>[:<kind>]`
+  adds bots (dummy, wanderer, hunter) so the game is playable and testable with no phone.
 - `game-web`: wasm-bindgen shell: canvas 2D (desynchronized), browser WebSocket and
   RTCPeerConnection. `cd game-web && trunk serve` serves on port 8081;
   `?server=ws://host:port/ws` overrides the signaling server.
@@ -24,7 +31,9 @@
 
 ## Wire protocol (deploy remote + game together)
 - `"channel"` (reliable):
-  - phone → game: `{"player-id":id}`, `{"set-name":n}`, `"ready"`, `"not-ready"`, `{"shoot":radians}`
+  - phone → game: `{"player-id":id}`, `{"set-name":n}`, `"ready"`, `"not-ready"`, `{"shoot":radians}`,
+    `{"buy":"bullet-speed"|"reload"|"move-speed"|"armor"}` (between rounds only; the phone has no
+    buy button yet)
   - game → phone: `"GameStart"`, `"GameOver"`
 - `"inputs"` (unordered, maxRetransmits 0):
   - `{"seq":n,"move":rad|null,"aim":rad|null}` on every stick change, capped at 120 Hz (one
