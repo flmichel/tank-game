@@ -133,3 +133,31 @@ fn every_player_of_a_full_game_gets_its_own_spawn() {
     assert_eq!(spawns.len(), PLAYERS as usize, "no two players share a spawn");
 }
 
+#[test]
+fn one_ready_player_starts_a_round_that_keeps_running() {
+    let resolution = (1600, 900);
+    let mut game = Game::new(MAP, resolution);
+    game.handle(MessageToGame::SynchronizePlayer(SynchronizePlayer {
+        socket_id: 0,
+        player_id: "player-0".to_owned(),
+    }));
+    send(&mut game, 0, ConfigurationInput::Ready);
+    game.tick(1.0);
+
+    let outbox = game.drain_outbox();
+    assert_eq!(outbox.len(), 1, "the solo player is told the game starts");
+    assert!(matches!(outbox[0].1, MessageToRemote::GameStart));
+
+    // Nothing can take the last player off the board, so the round does not end on its own
+    for _ in 0..300 {
+        game.tick(1. / 30.);
+    }
+    assert!(
+        game.drain_outbox().is_empty(),
+        "a solo round keeps running: no GameOver, and so no second GameStart"
+    );
+
+    let mut sprites = Sprites::default();
+    game.render(&mut sprites);
+    assert_eq!(sprites.faces.len(), 1, "the solo player is still on the board");
+}

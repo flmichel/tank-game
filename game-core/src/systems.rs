@@ -147,8 +147,9 @@ impl HandleInputs {
         }
     }
 
+    // One player is enough: a solo round has no opponent, so it is for trying the controls out
     fn can_game_start(&self, players: &WriteStorage<Player>) -> bool {
-        players.join().count() > 1 && self.all_players_are_ready(players)
+        self.all_players_are_ready(players)
     }
 
     fn all_players_are_ready(&self, players: &WriteStorage<Player>) -> bool {
@@ -243,8 +244,10 @@ impl HandleInputs {
             }
         }
 
-        // End the round when at most one player is left on the board (none left is a draw)
-        if (&players, &positions).join().count() <= 1 {
+        // End the round once the last opponent is gone (none left is a draw). Solo there is no
+        // opponent to lose, so that round runs until the player leaves.
+        let players_needed = players.join().count().min(2);
+        if (&players, &positions).join().count() < players_needed {
             for (entity, player) in (&entities, &mut players).join() {
                 player.is_winner = positions.contains(entity);
                 remove_from_board(entity, &mut positions, &mut movements, &mut circles);
