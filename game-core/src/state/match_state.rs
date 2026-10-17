@@ -90,3 +90,18 @@ impl Match {
         true
     }
 }
+
+impl Match {
+    /// Raises an upgrade level without charging for it.
+    ///
+    /// The game itself only ever grants upgrades through `buy`; this exists for harnesses that
+    /// need a given loadout on the board, such as a balance sweep.
+    pub fn grant(&mut self, player_id: &str, upgrade: Upgrade) {
+        let mut loadout = self.loadout(player_id);
+        if loadout.level(upgrade) >= balance::MAX_UPGRADE_LEVEL {
+            return;
+        }
+        loadout.raise(upgrade);
+        self.loadouts.insert(player_id.to_owned(), loadout);
+    }
+}

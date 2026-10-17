@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::error::{Error, ErrorKind::*};
+use crate::{
+    bot::Rng,
+    error::{Error, ErrorKind::*},
+};
 
 const PLAYER_DIAMETER: f32 = 0.5;
 
@@ -16,6 +19,9 @@ pub struct Map {
     available_spawns: Vec<Block>,
     pub block_matrix: Vec<Vec<BlockKind>>,
     block_size: u32,
+    /// Draws spawns. Seeded per map so a harness can replay a match; a real game seeds it
+    /// from the global generator, so spawns still vary round to round.
+    rng: Rng,
 }
 
 pub enum BlockKind {
@@ -25,6 +31,11 @@ pub enum BlockKind {
 
 impl Map {
     pub fn parse(map: &str, resolution: (u32, u32)) -> Map {
+        Map::parse_with_seed(map, resolution, rand::random())
+    }
+
+    /// Same map, with spawn draws that repeat for a given seed.
+    pub fn parse_with_seed(map: &str, resolution: (u32, u32), seed: u64) -> Map {
         let mut wall_set = HashSet::new();
         let mut spawns = Vec::new();
         let mut block_matrix = Vec::new();
@@ -69,6 +80,7 @@ impl Map {
             block_matrix,
             available_spawns,
             block_size,
+            rng: Rng::new(seed),
         }
     }
 
@@ -77,7 +89,7 @@ impl Map {
         if range.is_empty() {
             return Err(Error::new(NoSpawnAvailable, "no more spawns available"));
         }
-        let random_index = rand::random_range(range);
+        let random_index = (self.rng.next_u64() % range.len() as u64) as usize;
         Ok(self.available_spawns.remove(random_index))
     }
 

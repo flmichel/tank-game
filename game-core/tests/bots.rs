@@ -92,3 +92,28 @@ fn a_hunter_bot_closes_in_and_wins_the_round() {
     );
     assert_eq!(game.wallet("bot-2"), balance::STARTING_MONEY + balance::loss_bonus(1));
 }
+
+#[test]
+fn a_seeded_match_of_bots_replays() {
+    // What a balance sweep rests on: two runs of the same seed must differ only in what the
+    // sweep changed. Wanderers are the bots that actually draw from their generator.
+    let outcome = |seed| {
+        let mut game = Game::new_with_seed("s    s\n", (1600, 900), seed);
+        game.handle(MessageToGame::AddBot(BotKind::Wanderer));
+        game.handle(MessageToGame::AddBot(BotKind::Wanderer));
+        for _ in 0..30 * 30 {
+            game.tick(1. / 30.);
+            if game.rounds_played() > 0 {
+                break;
+            }
+        }
+        (
+            game.rounds_played(),
+            game.wallet("bot-1"),
+            game.wallet("bot-2"),
+        )
+    };
+
+    assert_eq!(outcome(7), outcome(7), "the same seed must replay exactly");
+    assert_eq!(outcome(12), outcome(12));
+}
